@@ -97,6 +97,10 @@ body{font-family:'Times New Roman',Times,serif;background:#eef2f7;min-height:100
 .acts-table tbody tr{border-bottom:0.5px solid #eef2f7;}
 .acts-table td{padding:6px 6px;vertical-align:middle;}
 .acts-table td input{width:100%;font-size:14px;padding:9px 10px;border:1px solid #e2e8f0;border-radius:5px;color:#2d3748;font-family:'Times New Roman',Times,serif;}
+.acts-table td.chk-cell{text-align:center;padding:6px 4px;}
+.acts-table td.chk-cell input[type=checkbox]{width:18px;height:18px;cursor:pointer;margin:0;padding:0;border:1px solid #cbd5e0;}
+.acts-table td.chk-cell.disabled-info{position:relative;}
+.acts-table td.chk-cell .chk-locked{font-size:11px;color:#1a3f6f;font-weight:700;letter-spacing:.3px;}
 .acts-table td input[type=time]{text-align:center;font-weight:700;color:#1a3f6f;font-size:15px;font-family:'Times New Roman',Times,serif;}
 .acts-table td.obs-td input{background:#fffde7;}
 .acts-table td.obs-td textarea{width:100%;font-size:14px;padding:9px 10px;border:1px solid #e2e8f0;border-radius:5px;color:#2d3748;font-family:'Times New Roman',Times,serif;background:#fffde7;resize:vertical;min-height:40px;line-height:1.4;}
@@ -531,7 +535,7 @@ body{font-family:'Times New Roman',Times,serif;background:#eef2f7;min-height:100
           <input type="date" id="agenda-fecha">
         </div>
         <table class="acts-table">
-          <thead><tr><th>Hora</th><th>Actividad</th><th>OBS</th><th></th></tr></thead>
+          <thead><tr><th>Hora</th><th>Actividad</th><th>OBS</th><th title="Enviar a Carta Gantt" style="width:54px;text-align:center;">GANTT</th><th title="Repetir todos los años" style="width:54px;text-align:center;">ANUAL</th><th></th></tr></thead>
           <tbody id="acts-body"></tbody>
         </table>
         <button class="btn-addrow" onclick="addActRow()">+ Agregar otra actividad</button>
@@ -1093,20 +1097,56 @@ function addActRow(){
   tr.innerHTML=`<td><input type="time" value="08:00"></td>
     <td><input type="text" placeholder="Actividad..." oninput="this.value=this.value.toUpperCase()"></td>
     <td class="obs-td"><textarea placeholder="OBS..." rows="1" oninput="this.value=this.value.toUpperCase();autoGrow(this);" onkeydown="if(event.key==='Enter'){event.stopPropagation();}"></textarea></td>
+    <td class="chk-cell"><input type="checkbox" class="chk-gantt" title="Enviar esta actividad a la Carta Gantt" onchange="onChkGanttChange(this)"></td>
+    <td class="chk-cell"><input type="checkbox" class="chk-anual" title="Repetir todos los años (también la envía a la Gantt)" disabled onchange="onChkAnualChange(this)"></td>
     <td><button class="del-r" onclick="this.closest('tr').remove()">&#10005;</button></td>`;
   tbody.appendChild(tr);
-  tr.querySelectorAll('input')[1].focus();
+  tr.querySelectorAll('input[type=text]')[0].focus();
+}
+
+// Cuando se marca "Anual" se marca también "Gantt" automáticamente.
+// Cuando se desmarca "Gantt" se desmarca y deshabilita "Anual".
+function onChkGanttChange(el){
+  const tr=el.closest('tr');
+  const anual=tr.querySelector('.chk-anual');
+  if(el.checked){
+    anual.disabled=false;
+  } else {
+    anual.checked=false;
+    anual.disabled=true;
+  }
+}
+function onChkAnualChange(el){
+  const tr=el.closest('tr');
+  const gantt=tr.querySelector('.chk-gantt');
+  if(el.checked && !gantt.checked){
+    gantt.checked=true;
+  }
 }
 
 function guardarAgenda(){
   const fecha=document.getElementById('agenda-fecha').value;
   if(!fecha){alert('Seleccione una fecha.');return;}
   const rows=[...document.querySelectorAll('#acts-body tr')];
-  const newActs=rows.map(r=>{
+  // Leemos cada fila completa para conocer también los flags Gantt/Anual.
+  const rowData=rows.map(r=>{
     const ins=r.querySelectorAll('input, textarea');
-    return {hora:ins[0].value,act:(ins[1].value||'').toUpperCase().trim(),obs:(ins[2].value||'').toUpperCase().trim()};
+    const chkG=r.querySelector('.chk-gantt');
+    const chkA=r.querySelector('.chk-anual');
+    return {
+      hora:ins[0].value,
+      act:(ins[1].value||'').toUpperCase().trim(),
+      obs:(ins[2].value||'').toUpperCase().trim(),
+      sendGantt: !!(chkG && chkG.checked),
+      sendAnual: !!(chkA && chkA.checked)
+    };
   }).filter(a=>a.act);
-  if(!newActs.length){alert('Ingrese al menos una actividad.');return;}
+  if(!rowData.length){alert('Ingrese al menos una actividad.');return;}
+
+  // Las que van a la agenda guardan sólo {hora, act, obs} (formato existente intacto).
+  const newActs=rowData.map(a=>({hora:a.hora, act:a.act, obs:a.obs}));
+  // Las que van a la Gantt llevan los flags; se sincronizan después de guardar la agenda.
+  const ganttActs=rowData.filter(a=>a.sendGantt);
 
   // Lee las actividades existentes y las combina con las nuevas
   db.ref(`maah_agenda/${currentUser.id}/${fecha}`).once('value',snap=>{
@@ -1117,6 +1157,10 @@ function guardarAgenda(){
     const obj=combined.reduce((o,a,i)=>{o[i]=a;return o;},{});
 
     db.ref(`maah_agenda/${currentUser.id}/${fecha}`).set(obj,()=>{
+      // Sincronizar las marcadas a la Carta Gantt (no bloquea el flujo de la agenda).
+      if(ganttActs.length){
+        sincronizarAGantt(fecha, ganttActs);
+      }
       loadAgendaForDate(fecha);
       const d=new Date(fecha+'T12:00:00');
       renderWeekNav(d);
@@ -1126,6 +1170,58 @@ function guardarAgenda(){
       const inclFrase=document.getElementById('tg-frase').checked;
       setTimeout(()=>buildAndSendAgenda(fecha, chatId, inclFrase), 800);
     });
+  });
+}
+
+// ── PUENTE AGENDA → CARTA GANTT ──────────────────────────────
+// Para cada actividad marcada, escribimos un registro en
+// gantt_maah/actividades_por_usuario/{userId}/{nuevoId}.
+// - sendAnual=true → guarda con anual:true (no usa fecha "real", la Gantt
+//   la calcula al vuelo en el año visible). Se guarda dia/mes y un
+//   "anchor year" sólo para reportes.
+// - sendAnual=false → actividad puntual con la fecha del día de la agenda.
+function sincronizarAGantt(fecha, items){
+  const ref=db.ref(`gantt_maah/actividades_por_usuario/${currentUser.id}`);
+  ref.once('value', snap=>{
+    const data=snap.val()||{};
+    // Calcular el siguiente id libre
+    let maxId=0;
+    Object.values(data).forEach(a=>{ if(a && typeof a.id==='number' && a.id>maxId) maxId=a.id; });
+    let nextId=maxId+1;
+    // ISO local sin TZ: "YYYY-MM-DDT12:00:00.000Z" lo evitamos; usamos
+    // 12:00 hora local para que ningún navegador caiga al día anterior.
+    const [yr,mo,da]=fecha.split('-').map(Number);
+    const fechaLocal=new Date(yr, mo-1, da, 12, 0, 0);
+    const updates={};
+    items.forEach(a=>{
+      const id=nextId++;
+      const titulo=a.act + (a.obs?(' · '+a.obs):'');
+      const reg={
+        id:id,
+        act:titulo.toUpperCase().trim(),
+        obs:(a.obs||'').toUpperCase().trim(),
+        type:'revision',
+        fecha:fechaLocal.toISOString(),
+        fromAgenda:true,
+        agendaFecha:fecha,
+        agendaHora:a.hora||''
+      };
+      if(a.sendAnual){
+        reg.anual=true;
+        reg.dia=da;     // 1-31
+        reg.mes=mo-1;   // 0-11 (igual que JS Date.getMonth)
+      }
+      updates[id]=reg;
+    });
+    ref.update(updates, err=>{
+      if(err){
+        console.error('Error sincronizando a Gantt:', err);
+        alert('La actividad se guardó en la agenda, pero hubo un error al enviarla a la Carta Gantt.\n'+err.message);
+      }
+    });
+  }, err=>{
+    console.error('Error leyendo Gantt:', err);
+    alert('La actividad se guardó en la agenda, pero no se pudo enviar a la Carta Gantt:\n'+err.message);
   });
 }
 
