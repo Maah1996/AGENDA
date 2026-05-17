@@ -2734,65 +2734,56 @@ function showActsPanel(tipo, mesOffset, anoOffset){
   // Año para filtro anual
   const anoBase = ref.getFullYear() + _resumenAnoOffset;
 
+  const gd = _ganttDataCache || {};
+  const btnNav = (label,onClick)=>`<button onclick="${onClick}" style="background:rgba(255,255,255,0.2);border:none;color:#fff;font-size:18px;cursor:pointer;padding:2px 8px;border-radius:4px;">${label}</button>`;
+  const buildItemsBody = (items)=>{
+    if(!items.length) return '<div class="ov-acts-empty">No hay actividades configuradas para este período.</div>';
+    let b=''; items.forEach(item=>{
+      const d=new Date(item.fecha+'T12:00:00');
+      b+=`<div class="ov-acts-date-hdr">${DLONG[d.getDay()]} ${d.getDate()} de ${MLONG[d.getMonth()]}</div>
+      <div class="ov-acts-row"><span class="ov-acts-time">${item.hora}</span>
+      <div class="ov-acts-info"><div class="ov-acts-name">${item.act}</div>${item.obs?`<div class="ov-acts-obs">${item.obs}</div>`:''}</div></div>`;
+      totalActs++;
+    }); return b;
+  };
+
   // ── CASO ESPECIAL: solo ANUAL ─────────────────────────────────
   let body = '', totalActs = 0, tituloPanel = '', navExtra = '';
 
-  if(soloAnual && _ganttDataCache){
+  if(soloAnual){
     tituloPanel = 'Actividades anuales — '+anoBase;
     navExtra = `<div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
-      <button onclick="showActsPanel('${tipo}',${_resumenMesOffset},${_resumenAnoOffset-1})" style="background:rgba(255,255,255,0.2);border:none;color:#fff;font-size:18px;cursor:pointer;padding:2px 8px;border-radius:4px;">‹</button>
+      ${btnNav('‹',`showActsPanel('${tipo}',${_resumenMesOffset},${_resumenAnoOffset-1})`)}
       <span style="font-size:13px;opacity:0.9;">${anoBase}</span>
-      <button onclick="showActsPanel('${tipo}',${_resumenMesOffset},${_resumenAnoOffset+1})" style="background:rgba(255,255,255,0.2);border:none;color:#fff;font-size:18px;cursor:pointer;padding:2px 8px;border-radius:4px;">›</button>
+      ${btnNav('›',`showActsPanel('${tipo}',${_resumenMesOffset},${_resumenAnoOffset+1})`)}
     </div>`;
     const items=[];
-    Object.values(_ganttDataCache).forEach(g=>{
+    Object.values(gd).forEach(g=>{
       if(!g||!g.act||!g.anual||g.dia===undefined||g.mes===undefined) return;
-      const dm=new Date(anoBase,g.mes+1,0).getDate();
-      if(g.dia>dm) return;
+      if(g.dia>new Date(anoBase,g.mes+1,0).getDate()) return;
       const fecha=anoBase+'-'+String(g.mes+1).padStart(2,'0')+'-'+String(g.dia).padStart(2,'0');
       items.push({fecha,hora:g.agendaHora||'08:00',act:g.act,obs:g.obs||''});
     });
     items.sort((a,b)=>a.fecha.localeCompare(b.fecha));
-    if(!items.length){
-      body='<div class="ov-acts-empty">No hay actividades anuales configuradas.</div>';
-    } else {
-      items.forEach(item=>{
-        const d=new Date(item.fecha+'T12:00:00');
-        body+=`<div class="ov-acts-date-hdr">${DLONG[d.getDay()]} ${d.getDate()} de ${MLONG[d.getMonth()]}</div>
-        <div class="ov-acts-row"><span class="ov-acts-time">${item.hora}</span>
-        <div class="ov-acts-info"><div class="ov-acts-name">${item.act}</div>${item.obs?`<div class="ov-acts-obs">${item.obs}</div>`:''}</div></div>`;
-        totalActs++;
-      });
-    }
+    body = buildItemsBody(items);
 
   // ── CASO ESPECIAL: solo MENSUAL ───────────────────────────────
-  } else if(soloMensual && _ganttDataCache){
+  } else if(soloMensual){
     tituloPanel = 'Actividades mensuales — '+MLONG[dispMonth]+' '+dispYear;
     navExtra = `<div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
-      <button onclick="showActsPanel('${tipo}',${_resumenMesOffset-1},${_resumenAnoOffset})" style="background:rgba(255,255,255,0.2);border:none;color:#fff;font-size:18px;cursor:pointer;padding:2px 8px;border-radius:4px;">‹</button>
+      ${btnNav('‹',`showActsPanel('${tipo}',${_resumenMesOffset-1},${_resumenAnoOffset})`)}
       <span style="font-size:13px;opacity:0.9;">${mesLabel}</span>
-      <button onclick="showActsPanel('${tipo}',${_resumenMesOffset+1},${_resumenAnoOffset})" style="background:rgba(255,255,255,0.2);border:none;color:#fff;font-size:18px;cursor:pointer;padding:2px 8px;border-radius:4px;">›</button>
+      ${btnNav('›',`showActsPanel('${tipo}',${_resumenMesOffset+1},${_resumenAnoOffset})`)}
     </div>`;
     const dm=new Date(dispYear,dispMonth+1,0).getDate();
     const items=[];
-    Object.values(_ganttDataCache).forEach(g=>{
-      if(!g||!g.act||!g.mensual||g.dia===undefined) return;
-      if(g.dia>dm) return;
+    Object.values(gd).forEach(g=>{
+      if(!g||!g.act||!g.mensual||g.dia===undefined||g.dia>dm) return;
       const fecha=dispYear+'-'+String(dispMonth+1).padStart(2,'0')+'-'+String(g.dia).padStart(2,'0');
       items.push({fecha,hora:g.agendaHora||'08:00',act:g.act,obs:g.obs||''});
     });
     items.sort((a,b)=>a.fecha.localeCompare(b.fecha));
-    if(!items.length){
-      body='<div class="ov-acts-empty">No hay actividades mensuales configuradas.</div>';
-    } else {
-      items.forEach(item=>{
-        const d=new Date(item.fecha+'T12:00:00');
-        body+=`<div class="ov-acts-date-hdr">${DLONG[d.getDay()]} ${d.getDate()} de ${MLONG[d.getMonth()]}</div>
-        <div class="ov-acts-row"><span class="ov-acts-time">${item.hora}</span>
-        <div class="ov-acts-info"><div class="ov-acts-name">${item.act}</div>${item.obs?`<div class="ov-acts-obs">${item.obs}</div>`:''}</div></div>`;
-        totalActs++;
-      });
-    }
+    body = buildItemsBody(items);
 
   // ── CASO NORMAL (sin filtro especial o semanal) ───────────────
   } else {
