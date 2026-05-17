@@ -1491,21 +1491,48 @@ function updateClock(){
   }
 }
 let _tgAutoLastSent='';
+let _tgPrioriLastSent='';
 setInterval(()=>{
   updateClock();
-  // Envío automático diario: chequea cada minuto si es la hora configurada
-  const autoChk=document.getElementById('tg-auto');
-  const horaChk=document.getElementById('tg-hora');
-  if(!autoChk||!horaChk||!autoChk.checked||!currentUser) return;
+  if(!currentUser) return;
   const now=new Date();
   const hhmm=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
   const hoy=fmtDateKey(now);
-  const key=hoy+'_'+hhmm;
-  if(hhmm===horaChk.value && key!==_tgAutoLastSent){
-    _tgAutoLastSent=key;
-    const chatId=currentUser.tgid||TG_ADMIN_CHATID;
-    const inclFrase=document.getElementById('tg-frase').checked;
-    buildAndSendAgenda(hoy, chatId, inclFrase);
+  const chatId=currentUser.tgid||TG_ADMIN_CHATID;
+
+  // ── Envío automático diario a la hora configurada ──
+  const autoChk=document.getElementById('tg-auto');
+  const horaChk=document.getElementById('tg-hora');
+  if(autoChk&&horaChk&&autoChk.checked){
+    const key=hoy+'_'+hhmm;
+    if(hhmm===horaChk.value && key!==_tgAutoLastSent){
+      _tgAutoLastSent=key;
+      const inclFrase=document.getElementById('tg-frase').checked;
+      buildAndSendAgenda(hoy, chatId, inclFrase);
+    }
+  }
+
+  // ── Envío automático 05:00 AM solo si hay actividades con prioridad ──
+  const prioriKey=hoy+'_05:00';
+  if(hhmm==='05:00' && prioriKey!==_tgPrioriLastSent){
+    _tgPrioriLastSent=prioriKey;
+    db.ref(`maah_agenda/${currentUser.id}/${hoy}`).once('value',snap=>{
+      const data=snap.val();
+      if(!data) return;
+      const prioriActs=Object.values(data).filter(a=>a&&a.priori);
+      if(!prioriActs.length) return;
+      prioriActs.sort((a,b)=>a.hora.localeCompare(b.hora));
+      const dias=['DOMINGO','LUNES','MARTES','MIÉRCOLES','JUEVES','VIERNES','SÁBADO'];
+      const meses=['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+      const d=new Date(hoy+'T12:00:00');
+      let msg=`🚨 <b>ACTIVIDADES PRIORITARIAS HOY:\n${dias[d.getDay()]} ${d.getDate()} DE ${meses[d.getMonth()]} DEL ${d.getFullYear()}</b>\n\n`;
+      prioriActs.forEach(a=>{
+        msg+=`⭐ <b>${a.hora}</b> — ${a.act}`;
+        if(a.obs) msg+=` <i>(${a.obs})</i>`;
+        msg+='\n';
+      });
+      sendTG(chatId, msg, hoy+'_priori');
+    });
   }
 },1000);
 
