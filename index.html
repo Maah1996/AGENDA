@@ -2717,6 +2717,7 @@ function showActsPanel(tipo, mesOffset, anoOffset){
   const hayFiltro = _resumenFiltros.semanal||_resumenFiltros.mensual||_resumenFiltros.anual;
   const soloMensual = _resumenFiltros.mensual && !_resumenFiltros.semanal && !_resumenFiltros.anual;
   const soloAnual   = _resumenFiltros.anual   && !_resumenFiltros.semanal && !_resumenFiltros.mensual;
+  const soloSemanal = _resumenFiltros.semanal  && !_resumenFiltros.mensual && !_resumenFiltros.anual;
 
   // Mes base para navegación normal
   const dispBase = new Date(ref); dispBase.setDate(1);
@@ -2785,11 +2786,36 @@ function showActsPanel(tipo, mesOffset, anoOffset){
     items.sort((a,b)=>a.fecha.localeCompare(b.fecha));
     body = buildItemsBody(items);
 
+  // ── CASO ESPECIAL: solo SEMANAL ───────────────────────────────
+  } else if(soloSemanal){
+    const semRef = new Date(ref);
+    semRef.setDate(semRef.getDate() + _resumenMesOffset * 7);
+    const monSem = tlGetMonday(semRef);
+    const sunSem = new Date(monSem); sunSem.setDate(monSem.getDate()+6);
+    const semTitulo = monSem.getMonth()===sunSem.getMonth()
+      ? monSem.getDate()+' al '+sunSem.getDate()+' de '+MLONG[monSem.getMonth()]+' '+monSem.getFullYear()
+      : monSem.getDate()+' de '+MLONG[monSem.getMonth()]+' al '+sunSem.getDate()+' de '+MLONG[sunSem.getMonth()]+' '+sunSem.getFullYear();
+    tituloPanel = 'Actividades de la semana del '+semTitulo;
+    navExtra = `<div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
+      ${btnNav('‹',`showActsPanel('${tipo}',${_resumenMesOffset-1},${_resumenAnoOffset})`)}
+      <span style="font-size:13px;opacity:0.9;">${semTitulo}</span>
+      ${btnNav('›',`showActsPanel('${tipo}',${_resumenMesOffset+1},${_resumenAnoOffset})`)}
+    </div>`;
+    const items=[];
+    for(let d=0;d<7;d++){
+      const dia=new Date(monSem); dia.setDate(monSem.getDate()+d);
+      const dKey=fmtDateKey(dia);
+      getRecurrentesParaFecha(dKey,gd).filter(a=>a._tipo==='semanal').forEach(a=>{
+        items.push({fecha:dKey,hora:a.hora,act:a.act,obs:a.obs||''});
+      });
+    }
+    body = buildItemsBody(items);
+
   // ── CASO NORMAL (sin filtro especial o semanal) ───────────────
   } else {
     const titulos = {
       hoy:    'Actividades de hoy — '+DLONG[ref.getDay()]+' '+ref.getDate()+' de '+MLONG[ref.getMonth()]+' '+ref.getFullYear(),
-      semana: 'Semana del '+monDisp.getDate()+' al '+sunDisp.getDate()+' de '+MLONG[dispMonth]+' '+dispYear,
+      semana: 'Actividades de la semana del '+monDisp.getDate()+' al '+sunDisp.getDate()+' de '+MLONG[dispMonth]+' '+dispYear,
       mes:    'Actividades de '+mesLabel,
     };
     tituloPanel = titulos[tipo]||titulos.mes;
