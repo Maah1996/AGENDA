@@ -2687,16 +2687,22 @@ function renderAgendaOverview(refDate, currentDayActsCount, forceRepaint){
 }
 
 // ── PANEL DE ACTIVIDADES (al hacer clic en un pill) ──────────
-function showActsPanel(tipo){
+let _resumenTipo = 'mes';
+let _resumenMesOffset = 0;
+
+function showActsPanel(tipo, mesOffset){
   if(!_agendaDataCache) return;
+  _resumenTipo = tipo;
+  if(tipo === 'mes') _resumenMesOffset = (mesOffset !== undefined) ? mesOffset : 0;
+
   const ref = tlCurrent;
   const refKey = fmtDateKey(ref);
   const DLONG = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
   const MLONG = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 
-  // Mes visualizado en el calendario (respeta la navegación con flechas)
+  // Mes base (calendario) + offset de navegación del panel
   const dispBase = new Date(ref); dispBase.setDate(1);
-  dispBase.setMonth(dispBase.getMonth() + calendarMonthOffset);
+  dispBase.setMonth(dispBase.getMonth() + calendarMonthOffset + (tipo==='mes' ? _resumenMesOffset : 0));
   const dispYear = dispBase.getFullYear();
   const dispMonth = dispBase.getMonth();
   const dispMonthPrefix = dispYear+'-'+String(dispMonth+1).padStart(2,'0');
@@ -2707,23 +2713,15 @@ function showActsPanel(tipo){
   const monKey = fmtDateKey(monDisp);
   const sunKey = fmtDateKey(sunDisp);
 
+  const mesLabel = MLONG[dispMonth]+' '+dispYear;
   const titulos = {
-    hoy: 'Actividades de hoy — '+DLONG[ref.getDay()]+' '+ref.getDate()+' de '+MLONG[ref.getMonth()],
-    semana: 'Actividades semana del '+monDisp.getDate()+' al '+sunDisp.getDate()+' de '+MLONG[dispMonth]+' '+dispYear,
-    diasmes: 'Días con actividades — '+MLONG[dispMonth]+' '+dispYear,
-    mes: 'Total de actividades — '+MLONG[dispMonth]+' '+dispYear,
-  };
-  const filtros = {
-    hoy: k => k === refKey,
-    semana: k => k >= monKey && k <= sunKey,
-    diasmes: k => k.startsWith(dispMonthPrefix),
-    mes: k => k.startsWith(dispMonthPrefix),
+    hoy: 'Actividades de hoy — '+DLONG[ref.getDay()]+' '+ref.getDate()+' de '+MLONG[ref.getMonth()]+' '+ref.getFullYear(),
+    semana: 'Semana del '+monDisp.getDate()+' al '+sunDisp.getDate()+' de '+MLONG[dispMonth]+' '+dispYear,
+    mes: 'Actividades de '+mesLabel,
   };
 
   // Construir conjunto de fechas del rango
   const todasFechas = new Set();
-  Object.keys(_agendaDataCache).filter(k=>filtros[tipo](k)).forEach(k=>todasFechas.add(k));
-  // Para semana y mes, también agregar fechas sin entradas en agenda (pueden tener recurrentes)
   if(tipo==='hoy'){
     todasFechas.add(refKey);
   } else if(tipo==='semana'){
@@ -2732,6 +2730,8 @@ function showActsPanel(tipo){
     const dm=new Date(dispYear,dispMonth+1,0).getDate();
     for(let d=1;d<=dm;d++) todasFechas.add(dispYear+'-'+String(dispMonth+1).padStart(2,'0')+'-'+String(d).padStart(2,'0'));
   }
+  // Añadir fechas de agenda que caigan en el rango
+  Object.keys(_agendaDataCache).forEach(k=>{if(todasFechas.has(k)&&_agendaDataCache[k]) todasFechas.add(k);});
 
   // Combinar agenda + gantt recurrentes por fecha
   const actsPorFecha={};
@@ -2743,6 +2743,7 @@ function showActsPanel(tipo){
   });
 
   const fechas=Object.keys(actsPorFecha).sort();
+  let totalActs=0;
 
   let body = '';
   if(fechas.length === 0){
@@ -2752,6 +2753,7 @@ function showActsPanel(tipo){
       const d = new Date(fecha+'T12:00:00');
       body += `<div class="ov-acts-date-hdr">${DLONG[d.getDay()]} ${d.getDate()} de ${MLONG[d.getMonth()]} ${d.getFullYear()}</div>`;
       actsPorFecha[fecha].forEach(act => {
+        totalActs++;
         body += `<div class="ov-acts-row">
           <span class="ov-acts-time">${act.hora||'--:--'}</span>
           <div class="ov-acts-info">
@@ -2762,6 +2764,14 @@ function showActsPanel(tipo){
       });
     });
   }
+
+  // Botones de navegación mes (solo para tipo='mes')
+  const navMes = tipo==='mes' ? `
+    <div style="display:flex;align-items:center;gap:6px;">
+      <button onclick="showActsPanel('mes',${_resumenMesOffset-1})" style="background:rgba(255,255,255,0.2);border:none;color:#fff;font-size:18px;cursor:pointer;padding:2px 8px;border-radius:4px;">‹</button>
+      <span style="font-size:13px;opacity:0.9;">${mesLabel}</span>
+      <button onclick="showActsPanel('mes',${_resumenMesOffset+1})" style="background:rgba(255,255,255,0.2);border:none;color:#fff;font-size:18px;cursor:pointer;padding:2px 8px;border-radius:4px;">›</button>
+    </div>` : '';
 
   let overlay = document.getElementById('ov-acts-overlay');
   if(!overlay){
@@ -2774,12 +2784,72 @@ function showActsPanel(tipo){
   overlay.innerHTML = `
     <div class="ov-acts-panel">
       <div class="ov-acts-head">
-        <span class="ov-acts-title">${titulos[tipo]}</span>
+        <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:0;">
+          <span class="ov-acts-title">${titulos[tipo]}</span>
+          ${navMes}
+        </div>
         <button class="ov-acts-close" onclick="document.getElementById('ov-acts-overlay').classList.remove('open')">×</button>
       </div>
-      <div class="ov-acts-body">${body}</div>
+      <div class="ov-acts-body" id="ov-acts-body-content">${body}</div>
+      <div style="display:flex;gap:8px;padding:10px 16px;border-top:1px solid #e2e8f0;background:#f7fafc;">
+        <span style="flex:1;font-size:11px;color:#718096;align-self:center;">${totalActs} actividad${totalActs!==1?'es':''}</span>
+        <button onclick="imprimirResumen()" style="padding:6px 14px;background:#2c5282;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;">🖨 Imprimir</button>
+        <button onclick="enviarResumenTG()" style="padding:6px 14px;background:#1a7fa6;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;">✈ Enviar</button>
+      </div>
     </div>`;
   overlay.classList.add('open');
+}
+
+function imprimirResumen(){
+  const content = document.getElementById('ov-acts-body-content');
+  const title = document.querySelector('.ov-acts-title');
+  if(!content) return;
+  const w = window.open('','_blank','width=600,height=800');
+  w.document.write(`<!DOCTYPE html><html><head><title>Resumen MAAH</title>
+  <style>body{font-family:'Times New Roman',serif;padding:20px;color:#2d3748;}
+  h2{color:#2c5282;border-bottom:2px solid #2c5282;padding-bottom:6px;}
+  .ov-acts-date-hdr{background:#ebf4ff;color:#2c5282;padding:6px 10px;margin:10px 0 4px;border-radius:4px;font-weight:bold;}
+  .ov-acts-row{display:flex;gap:12px;padding:4px 8px;border-bottom:1px solid #e2e8f0;}
+  .ov-acts-time{color:#718096;min-width:45px;font-size:13px;}
+  .ov-acts-name{font-weight:600;}
+  .ov-acts-obs{font-size:12px;color:#718096;}
+  .ov-acts-empty{color:#a0aec0;padding:20px;text-align:center;}
+  </style></head><body>
+  <h2>${title?title.textContent:'Resumen MAAH'}</h2>
+  ${content.innerHTML}
+  </body></html>`);
+  w.document.close();
+  w.focus();
+  setTimeout(()=>w.print(),400);
+}
+
+function enviarResumenTG(){
+  if(!currentUser) return;
+  const title = document.querySelector('.ov-acts-title');
+  const content = document.getElementById('ov-acts-body-content');
+  if(!content) return;
+  const chatId = currentUser.tgid||TG_ADMIN_CHATID;
+  let msg = `📋 <b>RESUMEN MAAH — ${title?title.textContent.toUpperCase():''}</b>\n👤 ${currentUser.nombre}\n\n`;
+  const hdrs = content.querySelectorAll('.ov-acts-date-hdr');
+  const rows = content.querySelectorAll('.ov-acts-row');
+  if(hdrs.length===0 && rows.length===0){
+    msg += 'Sin actividades en este período.';
+  } else {
+    let lastHdr='';
+    content.querySelectorAll('.ov-acts-date-hdr,.ov-acts-row').forEach(el=>{
+      if(el.classList.contains('ov-acts-date-hdr')){
+        lastHdr=el.textContent.trim();
+        msg+='\n📅 <b>'+lastHdr+'</b>\n';
+      } else {
+        const t=el.querySelector('.ov-acts-time');
+        const n=el.querySelector('.ov-acts-name');
+        const o=el.querySelector('.ov-acts-obs');
+        msg+='  🕐 '+(t?t.textContent:'')+'  '+(n?n.textContent:'')+(o?' ('+o.textContent+')':'')+'\n';
+      }
+    });
+  }
+  sendTG(chatId, msg, 'resumen_'+Date.now());
+  alert('Resumen enviado a Telegram ✓');
 }
 
 function renderTLDia(){
