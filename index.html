@@ -3126,6 +3126,7 @@ function renderTLMes(){
   }).catch(function(e){console.warn('renderTLMes error:',e);});
 }
 
+function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;');}
 function renderTimeline(fecha,acts,showDay){
   const tl=document.getElementById('timeline-view');
   if(!acts.length){tl.innerHTML='<div class="empty-tl">No hay actividades para este día.</div>';return;}
@@ -3142,13 +3143,15 @@ function renderTimeline(fecha,acts,showDay){
         <div class="meta">${a.hora}</div>
         ${a.obs?`<div class="obs-tag">${a.obs}</div>`:''}
         <div class="tl-actions">
-          <button class="tl-btn" onclick="openEditAct('${fecha}','${a.hora}','${a.act.replace(/'/g,"\\'")}','${(a.obs||'').replace(/'/g,"\\'").replace(/\n/g,"\\n").replace(/\r/g,"")}')">&#9998; Editar</button>
-          <button class="tl-btn del" onclick="deleteAct('${fecha}','${a.hora}','${a.act.replace(/'/g,"\\'")}','${(a.obs||'').replace(/'/g,"\\'").replace(/\n/g,"\\n").replace(/\r/g,"")}')">&#10005; Eliminar</button>
+          <button class="tl-btn" data-fecha="${esc(fecha)}" data-hora="${esc(a.hora)}" data-act="${esc(a.act)}" data-obs="${esc(a.obs||'')}" onclick="openEditActBtn(this)">&#9998; Editar</button>
+          <button class="tl-btn del" data-fecha="${esc(fecha)}" data-hora="${esc(a.hora)}" data-act="${esc(a.act)}" data-obs="${esc(a.obs||'')}" onclick="deleteActBtn(this)">&#10005; Eliminar</button>
         </div>
       </div>
     </div>`;
   }).join('');
 }
+function openEditActBtn(el){openEditAct(el.dataset.fecha,el.dataset.hora,el.dataset.act,el.dataset.obs);}
+function deleteActBtn(el){deleteAct(el.dataset.fecha,el.dataset.hora,el.dataset.act,el.dataset.obs);}
 
 function renderTimelineMulti(acts){
   const tl=document.getElementById('timeline-view');
