@@ -2720,9 +2720,29 @@ function showActsPanel(tipo){
     mes: k => k.startsWith(dispMonthPrefix),
   };
 
-  const fechas = Object.keys(_agendaDataCache)
-    .filter(k => filtros[tipo](k) && _agendaDataCache[k] && Object.keys(_agendaDataCache[k]).length > 0)
-    .sort();
+  // Construir conjunto de fechas del rango
+  const todasFechas = new Set();
+  Object.keys(_agendaDataCache).filter(k=>filtros[tipo](k)).forEach(k=>todasFechas.add(k));
+  // Para semana y mes, también agregar fechas sin entradas en agenda (pueden tener recurrentes)
+  if(tipo==='hoy'){
+    todasFechas.add(refKey);
+  } else if(tipo==='semana'){
+    for(let i=0;i<7;i++){const d=new Date(monDisp);d.setDate(monDisp.getDate()+i);todasFechas.add(fmtDateKey(d));}
+  } else {
+    const dm=new Date(dispYear,dispMonth+1,0).getDate();
+    for(let d=1;d<=dm;d++) todasFechas.add(dispYear+'-'+String(dispMonth+1).padStart(2,'0')+'-'+String(d).padStart(2,'0'));
+  }
+
+  // Combinar agenda + gantt recurrentes por fecha
+  const actsPorFecha={};
+  todasFechas.forEach(fecha=>{
+    const agendaActs=(_agendaDataCache[fecha]?Object.values(_agendaDataCache[fecha]):[]).filter(a=>a&&a.act);
+    const ganttActs=_ganttDataCache?getRecurrentesParaFecha(fecha,_ganttDataCache):[];
+    const merged=[...agendaActs,...ganttActs].sort((a,b)=>(a.hora||'').localeCompare(b.hora||''));
+    if(merged.length>0) actsPorFecha[fecha]=merged;
+  });
+
+  const fechas=Object.keys(actsPorFecha).sort();
 
   let body = '';
   if(fechas.length === 0){
@@ -2731,10 +2751,7 @@ function showActsPanel(tipo){
     fechas.forEach(fecha => {
       const d = new Date(fecha+'T12:00:00');
       body += `<div class="ov-acts-date-hdr">${DLONG[d.getDay()]} ${d.getDate()} de ${MLONG[d.getMonth()]} ${d.getFullYear()}</div>`;
-      const acts = Object.values(_agendaDataCache[fecha])
-        .filter(a => a && a.act)
-        .sort((a,b) => (a.hora||'').localeCompare(b.hora||''));
-      acts.forEach(act => {
+      actsPorFecha[fecha].forEach(act => {
         body += `<div class="ov-acts-row">
           <span class="ov-acts-time">${act.hora||'--:--'}</span>
           <div class="ov-acts-info">
