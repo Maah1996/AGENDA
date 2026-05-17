@@ -1985,9 +1985,12 @@ function startApp(){
   loadClima();
   // Efemérides y Telegram solo para admin
   const esAdmin=currentUser&&currentUser.rol==='admin';
-  document.querySelector('.efem-card').style.display=esAdmin?'':'none';
-  document.querySelector('.tg-toggle-row').style.display=esAdmin?'':'none';
-  document.querySelector('#tg-collapsible').style.display=esAdmin?'':'none';
+  const _efemEl=document.querySelector('.efem-card');
+  const _tgRowEl=document.querySelector('.tg-toggle-row');
+  const _tgColEl=document.getElementById('tg-collapsible');
+  if(_efemEl) _efemEl.style.display=esAdmin?'':'none';
+  if(_tgRowEl) _tgRowEl.style.display=esAdmin?'':'none';
+  if(_tgColEl && !esAdmin) _tgColEl.style.display='none';
   if(esAdmin) renderEfemeride();
   const hoy=fmtDateKey(TODAY);
   document.getElementById('agenda-fecha').value=hoy;
