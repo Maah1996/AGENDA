@@ -2608,6 +2608,8 @@ let _agendaDataCache = null;
 let _agendaDataCacheTime = 0;
 let _ganttDataCache = null;
 const AGENDA_CACHE_MS = 30000; // 30 segundos
+let _semanaOffset = 0;        // offset de semana en el pill SEMANA (0=esta semana)
+let _lastDayActsCount = 0;    // para re-pintar el overview al navegar semana
 
 // ── AGENDA OVERVIEW: mini-calendario + estadísticas ──
 // Pinta encima del timeline cuando estamos en modo "Día".
@@ -2684,10 +2686,26 @@ function renderAgendaOverview(refDate, currentDayActsCount, forceRepaint){
       <div class="ov-pill-lbl">ACT. HOY</div>
       <div class="ov-pill-val">${currentDayActsCount}</div>
       <div class="ov-pill-sub">actividad${currentDayActsCount!==1?'es':''}</div></div>`;
-    html += `<div class="ov-pill" onclick="showActsPanel('semana')">
-      <div class="ov-pill-lbl">SEMANA</div>
-      <div class="ov-pill-val">${totalSemana}</div>
-      <div class="ov-pill-sub">actividad${totalSemana!==1?'es':''}</div></div>`;
+    // Calcular semana con offset
+    _lastDayActsCount = currentDayActsCount;
+    const monOff=new Date(monDisp); monOff.setDate(monDisp.getDate()+_semanaOffset*7);
+    const sunOff=new Date(monOff); sunOff.setDate(monOff.getDate()+6);
+    const monOffKey=fmtDateKey(monOff), sunOffKey=fmtDateKey(sunOff);
+    let totalSemOff=0;
+    Object.keys(data).forEach(k=>{if(k>=monOffKey&&k<=sunOffKey&&data[k])totalSemOff+=Object.keys(data[k]).length;});
+    if(ganttData&&Object.keys(ganttData).length>0){for(let d=0;d<7;d++){const dd=new Date(monOff);dd.setDate(monOff.getDate()+d);totalSemOff+=getRecurrentesParaFecha(fmtDateKey(dd),ganttData).length;}}
+    const semLbl=_semanaOffset===0?'ESTA SEMANA':_semanaOffset===1?'PRÓX. SEMANA':_semanaOffset===-1?'SEM. ANTERIOR':`SEMANA ${_semanaOffset>0?'+':''}${_semanaOffset}`;
+    const semFechaLbl=monOff.getDate()+'/'+(monOff.getMonth()+1)+' — '+sunOff.getDate()+'/'+(sunOff.getMonth()+1);
+    html += `<div class="ov-pill" style="padding:8px 6px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:2px;">
+        <button onclick="event.stopPropagation();navSemanaOv(-1)" style="background:#e8eef6;border:none;color:#1a3f6f;font-size:14px;cursor:pointer;padding:2px 7px;border-radius:5px;font-weight:700;">◀</button>
+        <div onclick="showActsPanel('semana')" style="flex:1;text-align:center;cursor:pointer;">
+          <div class="ov-pill-lbl" style="font-size:9px;">${semLbl}</div>
+          <div class="ov-pill-val">${totalSemOff}</div>
+          <div class="ov-pill-sub">${semFechaLbl}</div>
+        </div>
+        <button onclick="event.stopPropagation();navSemanaOv(1)" style="background:#e8eef6;border:none;color:#1a3f6f;font-size:14px;cursor:pointer;padding:2px 7px;border-radius:5px;font-weight:700;">▶</button>
+      </div></div>`;
     html += `<div class="ov-pill" onclick="showActsPanel('mes')">
       <div class="ov-pill-lbl">TOTAL ACTIVIDADES ${refMonthName.toUpperCase()}</div>
       <div class="ov-pill-val">${totalMes}</div>
@@ -2761,6 +2779,11 @@ function renderAgendaOverview(refDate, currentDayActsCount, forceRepaint){
   }).catch(function(err){
     console.warn('[MAAH] Error cargando overview:',err);
   });
+}
+
+function navSemanaOv(delta){
+  _semanaOffset+=delta;
+  renderAgendaOverview(tlCurrent,_lastDayActsCount);
 }
 
 // ── PANEL DE ACTIVIDADES (al hacer clic en un pill) ──────────
@@ -2884,12 +2907,25 @@ function showActsPanel(tipo, mesOffset, anoOffset){
 
   // ── CASO NORMAL (sin filtro especial o semanal) ───────────────
   } else {
+    // Para semana: usar _semanaOffset en vez de _resumenMesOffset
+    const monSemPanel=new Date(tlGetMonday(ref)); monSemPanel.setDate(tlGetMonday(ref).getDate()+_semanaOffset*7);
+    const sunSemPanel=new Date(monSemPanel); sunSemPanel.setDate(monSemPanel.getDate()+6);
+    const monSemKey=fmtDateKey(monSemPanel), sunSemKey=fmtDateKey(sunSemPanel);
+    const semPanelLbl=monSemPanel.getDate()+' de '+MLONG[monSemPanel.getMonth()]+' al '+sunSemPanel.getDate()+' de '+MLONG[sunSemPanel.getMonth()]+' '+sunSemPanel.getFullYear();
+
     const titulos = {
       hoy:    'Actividades de hoy — '+DLONG[ref.getDay()]+' '+ref.getDate()+' de '+MLONG[ref.getMonth()]+' '+ref.getFullYear(),
-      semana: 'Actividades de la semana del '+monDisp.getDate()+' al '+sunDisp.getDate()+' de '+MLONG[dispMonth]+' '+dispYear,
+      semana: 'Actividades — semana del '+semPanelLbl,
       mes:    'Actividades de '+mesLabel,
     };
     tituloPanel = titulos[tipo]||titulos.mes;
+    if(tipo==='semana'){
+      navExtra=`<div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
+        <button onclick="navSemanaOv(-1);showActsPanel('semana')" style="background:rgba(255,255,255,0.2);border:none;color:#fff;font-size:18px;cursor:pointer;padding:2px 8px;border-radius:4px;">‹</button>
+        <span style="font-size:12px;opacity:0.9;">${semPanelLbl}</span>
+        <button onclick="navSemanaOv(1);showActsPanel('semana')" style="background:rgba(255,255,255,0.2);border:none;color:#fff;font-size:18px;cursor:pointer;padding:2px 8px;border-radius:4px;">›</button>
+      </div>`;
+    }
     if(tipo==='mes'){
       navExtra=`<div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
         <button onclick="showActsPanel('mes',${_resumenMesOffset-1},${_resumenAnoOffset})" style="background:rgba(255,255,255,0.2);border:none;color:#fff;font-size:18px;cursor:pointer;padding:2px 8px;border-radius:4px;">‹</button>
@@ -2899,7 +2935,7 @@ function showActsPanel(tipo, mesOffset, anoOffset){
     }
     const todasFechas=new Set();
     if(tipo==='hoy'){ todasFechas.add(refKey); }
-    else if(tipo==='semana'){ for(let i=0;i<7;i++){const d=new Date(monDisp);d.setDate(monDisp.getDate()+i);todasFechas.add(fmtDateKey(d));} }
+    else if(tipo==='semana'){ for(let i=0;i<7;i++){const d=new Date(monSemPanel);d.setDate(monSemPanel.getDate()+i);todasFechas.add(fmtDateKey(d));} }
     else { const dm=new Date(dispYear,dispMonth+1,0).getDate(); for(let d=1;d<=dm;d++) todasFechas.add(dispYear+'-'+String(dispMonth+1).padStart(2,'0')+'-'+String(d).padStart(2,'0')); }
     Object.keys(_agendaDataCache).forEach(k=>{if(todasFechas.has(k)&&_agendaDataCache[k]) todasFechas.add(k);});
     const actsPorFecha={};
