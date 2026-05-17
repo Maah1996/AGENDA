@@ -2185,9 +2185,12 @@ function guardarAgenda(){
       renderWeekNav(d);
       document.getElementById('acts-body').innerHTML='';
       addActRow();
-      const chatId=currentUser.tgid||TG_ADMIN_CHATID;
-      const inclFrase=document.getElementById('tg-frase').checked;
-      setTimeout(()=>buildAndSendAgenda(fecha, chatId, inclFrase), 800);
+      // Solo enviar a Telegram si la fecha guardada es hoy
+      if(fecha===fmtDateKey(new Date())){
+        const chatId=currentUser.tgid||TG_ADMIN_CHATID;
+        const inclFrase=document.getElementById('tg-frase').checked;
+        setTimeout(()=>buildAndSendAgenda(fecha, chatId, inclFrase), 800);
+      }
     });
   });
 }
@@ -3282,9 +3285,12 @@ function saveEditAct(){
     _agendaDataCache=null; _ganttDataCache=null;
     closeModal('modal-edit-act');
     loadAgendaForDate(editingActDate);
-    const chatId=currentUser.tgid||TG_ADMIN_CHATID;
-    const inclFrase=document.getElementById('tg-frase').checked;
-    buildAndSendAgenda(editingActDate,chatId,inclFrase);
+    // Solo enviar a Telegram si la fecha editada es hoy
+    if(editingActDate===fmtDateKey(new Date())){
+      const chatId=currentUser.tgid||TG_ADMIN_CHATID;
+      const inclFrase=document.getElementById('tg-frase').checked;
+      buildAndSendAgenda(editingActDate,chatId,inclFrase);
+    }
   }).catch(e=>console.warn('saveEditAct error:',e));
 }
 
