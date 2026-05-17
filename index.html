@@ -1983,7 +1983,12 @@ function startApp(){
   }
   mostrarFrases();
   loadClima();
-  renderEfemeride();
+  // Efemérides y Telegram solo para admin
+  const esAdmin=currentUser&&currentUser.rol==='admin';
+  document.querySelector('.efem-card').style.display=esAdmin?'':'none';
+  document.querySelector('.tg-toggle-row').style.display=esAdmin?'':'none';
+  document.querySelector('#tg-collapsible').style.display=esAdmin?'':'none';
+  if(esAdmin) renderEfemeride();
   const hoy=fmtDateKey(TODAY);
   document.getElementById('agenda-fecha').value=hoy;
   addActRow();
