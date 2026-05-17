@@ -3271,6 +3271,9 @@ function saveEditAct(){
     } else {
       agendaWrite=origenPath.set(agendaEntry);
     }
+  } else {
+    // Actividad que viene del Gantt (sin clave en agenda) → crear entrada nueva
+    agendaWrite=db.ref('maah_agenda/'+currentUser.id+'/'+fechaDestino).push(agendaEntry);
   }
 
   // 2. Actualizar / crear / borrar entrada en Gantt
