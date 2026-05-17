@@ -1027,8 +1027,8 @@ body{font-family:'Times New Roman',Times,serif;background:#eef2f7;min-height:100
         <div class="meta">08:00</div>
         <div class="obs-tag">BRIACO</div>
         <div class="tl-actions">
-          <button class="tl-btn" onclick="openEditAct(&#39;2026-05-06&#39;,0,&#39;08:00&#39;,&#39;CJ - FORMACIÓN&#39;,&#39;BRIACO&#39;)">✎ Editar</button>
-          <button class="tl-btn del" onclick="deleteAct(&#39;2026-05-06&#39;,0,&#39;08:00&#39;,&#39;CJ - FORMACIÓN&#39;,&#39;BRIACO&#39;)">✕ Eliminar</button>
+          <button class="tl-btn" onclick="openEditAct(&#39;2026-05-06&#39;,&#39;08:00&#39;,&#39;CJ - FORMACIÓN&#39;,&#39;BRIACO&#39;)">✎ Editar</button>
+          <button class="tl-btn del" onclick="deleteAct(&#39;2026-05-06&#39;,&#39;08:00&#39;,&#39;CJ - FORMACIÓN&#39;,&#39;BRIACO&#39;)">✕ Eliminar</button>
         </div>
       </div>
     </div></div>
@@ -1297,9 +1297,15 @@ body{font-family:'Times New Roman',Times,serif;background:#eef2f7;min-height:100
     <h3>✎ Editar actividad</h3>
     <div class="mfg"><label>Hora</label><input type="time" id="edit-act-hora"></div>
     <div class="mfg"><label>Actividad</label><input type="text" id="edit-act-desc" oninput="this.value=this.value.toUpperCase()"></div>
-    <div class="mfg"><label>OBS</label><textarea id="edit-act-obs" rows="3" style="width:100%;font-size:12px;padding:7px 10px;border:1px solid #cbd5e0;border-radius:5px;color:#2d3748;font-family:&#39;Times New Roman&#39;,Times,serif;background:#fffde7;resize:vertical;line-height:1.4;" oninput="this.value=this.value.toUpperCase()"></textarea></div>
+    <div class="mfg"><label>OBS</label><textarea id="edit-act-obs" rows="3" style="width:100%;font-size:12px;padding:7px 10px;border:1px solid #cbd5e0;border-radius:5px;color:#2d3748;font-family:'Times New Roman',Times,serif;background:#fffde7;resize:vertical;line-height:1.4;" oninput="this.value=this.value.toUpperCase()"></textarea></div>
+    <div class="mfg" style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;padding:6px 0;">
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:12px;"><input type="checkbox" id="edit-chk-gantt"> GANTT</label>
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:12px;"><input type="checkbox" id="edit-chk-semanal"> SEMANAL</label>
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:12px;"><input type="checkbox" id="edit-chk-mensual"> MENSUAL</label>
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:12px;"><input type="checkbox" id="edit-chk-anual"> ANUAL</label>
+    </div>
     <div class="modal-btns">
-      <button class="btn-cancel-m" onclick="closeModal(&#39;modal-edit-act&#39;)">Cancelar</button>
+      <button class="btn-cancel-m" onclick="closeModal('modal-edit-act')">Cancelar</button>
       <button class="btn-save-m" onclick="saveEditAct()">Guardar cambios</button>
     </div>
   </div>
@@ -1773,7 +1779,7 @@ function climaResetCity(){
 // ── ESTADO ───────────────────────────────────────────────────
 const TODAY=new Date(); TODAY.setHours(0,0,0,0);
 let currentUser=null;
-let editingActKey=null, editingActDate=null, editingActOld=null;
+let editingActKey=null, editingActDate=null, editingActOld=null, editingActGanttKey=null;
 let editingUserId=null;
 
 // ── CATÁLOGO DE SERVICIOS MAAH ───────────────────────────────
@@ -2111,7 +2117,7 @@ function guardarAgenda(){
 
     db.ref(`maah_agenda/${currentUser.id}/${fecha}`).set(obj,()=>{
       // Invalidar cache del overview para que refleje cambios
-      _agendaDataCache = null;
+      _agendaDataCache = null; _ganttDataCache = null;
       // Sincronizar las marcadas a la Carta Gantt (no bloquea el flujo de la agenda).
       if(ganttActs.length){
         sincronizarAGantt(fecha, ganttActs);
@@ -2523,6 +2529,7 @@ function calNavMes(delta){
 // Cache de datos del agenda completo del usuario (para evitar parpadeo y queries repetidas)
 let _agendaDataCache = null;
 let _agendaDataCacheTime = 0;
+let _ganttDataCache = null;
 const AGENDA_CACHE_MS = 30000; // 30 segundos
 
 // ── AGENDA OVERVIEW: mini-calendario + estadísticas ──
@@ -2540,7 +2547,7 @@ function renderAgendaOverview(refDate, currentDayActsCount, forceRepaint){
 
   // ── Función interna que pinta con datos ya cargados ──
   // Se separa así para que podamos usar cache (sin parpadeo) o Firebase (primera vez)
-  const pintar = (data)=>{
+  const pintar = (data, ganttData)=>{
     // Calcular el mes a mostrar según el offset
     const baseDate = new Date(refDate);
     baseDate.setDate(1);
@@ -2574,6 +2581,20 @@ function renderAgendaOverview(refDate, currentDayActsCount, forceRepaint){
         totalSemana += cant;
       }
     });
+
+    // Sumar ítems recurrentes de Gantt para cada día del mes
+    if(ganttData && Object.keys(ganttData).length>0){
+      const dm=new Date(year,month+1,0).getDate();
+      for(let d=1;d<=dm;d++){
+        const dKey=year+'-'+String(month+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+        const rec=getRecurrentesParaFecha(dKey,ganttData);
+        if(rec.length>0){
+          fechasConAct.add(dKey);
+          totalMes+=rec.length;
+          if(dKey>=monKey && dKey<=sunKey) totalSemana+=rec.length;
+        }
+      }
+    }
 
     // ── Construir HTML COMPLETO antes de tocar el DOM ──
     const refMonthName = MESES_LARGO[month];
@@ -2645,22 +2666,23 @@ function renderAgendaOverview(refDate, currentDayActsCount, forceRepaint){
 
   // ── Estrategia de carga: cache primero, Firebase si está vencido ──
   const ahora = Date.now();
-  if(_agendaDataCache && (forceRepaint || (ahora - _agendaDataCacheTime) < AGENDA_CACHE_MS)){
-    // Cache válido o repintado forzado (ej: cambio de país): pintar al instante
-    pintar(_agendaDataCache);
+  if(_agendaDataCache && _ganttDataCache && (forceRepaint || (ahora - _agendaDataCacheTime) < AGENDA_CACHE_MS)){
+    pintar(_agendaDataCache, _ganttDataCache);
     return;
   }
 
-  // Cache vencido o nunca cargado: leer Firebase
-  // PERO no borramos el contenido viejo todavía — el DOM se actualiza solo cuando lleguen los datos
-  db.ref('maah_agenda/'+currentUser.id).once('value').then(snap=>{
-    const data = snap.val() || {};
-    _agendaDataCache = data;
-    _agendaDataCacheTime = Date.now();
-    pintar(data);
-  }).catch(err=>{
-    console.warn('[MAAH] Error cargando overview:', err);
-    // No borrar nada en caso de error
+  Promise.all([
+    db.ref('maah_agenda/'+currentUser.id).once('value'),
+    db.ref('gantt_maah/actividades_por_usuario/'+currentUser.id).once('value')
+  ]).then(function(snaps){
+    const data=snaps[0].val()||{};
+    const ganttData=snaps[1].val()||{};
+    _agendaDataCache=data;
+    _agendaDataCacheTime=Date.now();
+    _ganttDataCache=ganttData;
+    pintar(data,ganttData);
+  }).catch(function(err){
+    console.warn('[MAAH] Error cargando overview:',err);
   });
 }
 
@@ -2871,8 +2893,8 @@ function renderTimeline(fecha,acts,showDay){
         <div class="meta">${a.hora}</div>
         ${a.obs?`<div class="obs-tag">${a.obs}</div>`:''}
         <div class="tl-actions">
-          <button class="tl-btn" onclick="openEditAct('${fecha}',${i},'${a.hora}','${a.act.replace(/'/g,"\\'")}','${(a.obs||'').replace(/'/g,"\\'").replace(/\n/g,"\\n").replace(/\r/g,"")}')">&#9998; Editar</button>
-          <button class="tl-btn del" onclick="deleteAct('${fecha}',${i},'${a.hora}','${a.act.replace(/'/g,"\\'")}','${(a.obs||'').replace(/'/g,"\\'").replace(/\n/g,"\\n").replace(/\r/g,"")}')">&#10005; Eliminar</button>
+          <button class="tl-btn" onclick="openEditAct('${fecha}','${a.hora}','${a.act.replace(/'/g,"\\'")}','${(a.obs||'').replace(/'/g,"\\'").replace(/\n/g,"\\n").replace(/\r/g,"")}')">&#9998; Editar</button>
+          <button class="tl-btn del" onclick="deleteAct('${fecha}','${a.hora}','${a.act.replace(/'/g,"\\'")}','${(a.obs||'').replace(/'/g,"\\'").replace(/\n/g,"\\n").replace(/\r/g,"")}')">&#10005; Eliminar</button>
         </div>
       </div>
     </div>`;
@@ -2924,12 +2946,43 @@ function selectDay(fecha){
   document.getElementById('acts-body').innerHTML='';
   addActRow();
 }
-function openEditAct(fecha,idx,hora,act,obs){
-  editingActKey=idx; editingActDate=fecha;
+function openEditAct(fecha,hora,act,obs){
+  editingActKey=null; editingActGanttKey=null; editingActDate=fecha;
   editingActOld={hora,act,obs};
   document.getElementById('edit-act-hora').value=hora;
   document.getElementById('edit-act-desc').value=act;
   document.getElementById('edit-act-obs').value=obs;
+  ['edit-chk-gantt','edit-chk-semanal','edit-chk-mensual','edit-chk-anual'].forEach(id=>{
+    document.getElementById(id).checked=false;
+  });
+  // Buscar en Gantt para pre-marcar los checkboxes
+  db.ref('gantt_maah/actividades_por_usuario/'+currentUser.id).once('value',snap=>{
+    const gd=snap.val()||{};
+    const parts=fecha.split('-');
+    const da=+parts[2],mo=+parts[1];
+    const dateObj=new Date(+parts[0],mo-1,da,12,0,0);
+    Object.entries(gd).forEach(([k,v])=>{
+      if(!v) return;
+      const isPuntual=v.agendaFecha===fecha && v.agendaHora===hora && !v.semanal && !v.mensual && !v.anual;
+      const isAnual=v.anual===true && v.dia===da && v.mes===mo-1 && v.agendaHora===hora;
+      const isMensual=v.mensual===true && v.dia===da && v.agendaHora===hora;
+      const isSemanal=v.semanal===true && (v.dow===dateObj.getDay()||v.diaSemana===dateObj.getDay()) && v.agendaHora===hora;
+      if(isPuntual||isAnual||isMensual||isSemanal){
+        editingActGanttKey=k;
+        document.getElementById('edit-chk-gantt').checked=isPuntual;
+        document.getElementById('edit-chk-semanal').checked=!!v.semanal;
+        document.getElementById('edit-chk-mensual').checked=!!v.mensual;
+        document.getElementById('edit-chk-anual').checked=!!v.anual;
+      }
+    });
+    // Buscar clave en agenda por hora+act
+    db.ref('maah_agenda/'+currentUser.id+'/'+fecha).once('value',snapA=>{
+      const ad=snapA.val()||{};
+      Object.entries(ad).forEach(([k,v])=>{
+        if(v && v.hora===hora && v.act===act) editingActKey=k;
+      });
+    });
+  });
   document.getElementById('modal-edit-act').classList.add('open');
 }
 
@@ -2937,35 +2990,111 @@ function saveEditAct(){
   const hora=document.getElementById('edit-act-hora').value;
   const act=document.getElementById('edit-act-desc').value.toUpperCase().trim();
   const obs=document.getElementById('edit-act-obs').value.toUpperCase().trim();
+  const sendGantt=document.getElementById('edit-chk-gantt').checked;
+  const sendSemanal=document.getElementById('edit-chk-semanal').checked;
+  const sendMensual=document.getElementById('edit-chk-mensual').checked;
+  const sendAnual=document.getElementById('edit-chk-anual').checked;
   if(!act){alert('Ingrese una descripción.');return;}
-  db.ref(`maah_agenda/${currentUser.id}/${editingActDate}/${editingActKey}`).set({hora,act,obs},()=>{
-    _agendaDataCache = null; // Invalidar cache
+
+  const [yr,mo,da]=editingActDate.split('-').map(Number);
+  const fechaLocal=new Date(yr,mo-1,da,12,0,0);
+  const ganttRef=db.ref('gantt_maah/actividades_por_usuario/'+currentUser.id);
+
+  // 1. Actualizar entrada en Agenda
+  const agendaEntry={hora,act,obs};
+  const agendaPath=editingActKey!=null
+    ? db.ref('maah_agenda/'+currentUser.id+'/'+editingActDate+'/'+editingActKey)
+    : null;
+  const agendaWrite=agendaPath
+    ? agendaPath.set(agendaEntry)
+    : Promise.resolve();
+
+  // 2. Actualizar / crear / borrar entrada en Gantt
+  const anyGantt=sendGantt||sendSemanal||sendMensual||sendAnual;
+  let ganttWrite=Promise.resolve();
+  if(editingActGanttKey){
+    if(anyGantt){
+      const titulo=act+(obs?' · '+obs:'');
+      const upd={act:titulo,obs:obs,agendaHora:hora,agendaFecha:editingActDate,fromAgenda:true};
+      upd.freq=sendAnual?'anual':sendMensual?'mensual':sendSemanal?'semanal':'puntual';
+      upd.anual=sendAnual||null; upd.mensual=sendMensual||null; upd.semanal=sendSemanal||null;
+      upd.dia=(sendAnual||sendMensual)?da:null;
+      upd.mes=sendAnual?(mo-1):null;
+      upd.dow=sendSemanal?fechaLocal.getDay():null;
+      ganttWrite=ganttRef.child(editingActGanttKey).update(upd);
+    } else {
+      ganttWrite=ganttRef.child(editingActGanttKey).remove();
+    }
+  } else if(anyGantt){
+    ganttWrite=ganttRef.once('value').then(snap=>{
+      const data=snap.val()||{};
+      let maxId=0;
+      Object.values(data).forEach(a=>{if(a&&typeof a.id==='number'&&a.id>maxId)maxId=a.id;});
+      const id=maxId+1;
+      const titulo=act+(obs?' · '+obs:'');
+      const reg={id,act:titulo,obs,type:'revision',fecha:fechaLocal.toISOString(),
+        fromAgenda:true,agendaFecha:editingActDate,agendaHora:hora};
+      reg.freq=sendAnual?'anual':sendMensual?'mensual':sendSemanal?'semanal':'puntual';
+      if(sendAnual){reg.anual=true;reg.dia=da;reg.mes=mo-1;}
+      if(sendMensual){reg.mensual=true;reg.dia=da;}
+      if(sendSemanal){reg.semanal=true;reg.dow=fechaLocal.getDay();}
+      return ganttRef.child(id).set(reg);
+    });
+  }
+
+  Promise.all([agendaWrite,ganttWrite]).then(()=>{
+    _agendaDataCache=null; _ganttDataCache=null;
     closeModal('modal-edit-act');
     loadAgendaForDate(editingActDate);
-    // Edita el mensaje existente en Telegram con la agenda actualizada
     const chatId=currentUser.tgid||TG_ADMIN_CHATID;
     const inclFrase=document.getElementById('tg-frase').checked;
-    buildAndSendAgenda(editingActDate, chatId, inclFrase);
-  });
+    buildAndSendAgenda(editingActDate,chatId,inclFrase);
+  }).catch(e=>console.warn('saveEditAct error:',e));
 }
 
 // ELIMINAR ACTIVIDAD
-function deleteAct(fecha,idx,hora,act,obs){
+function deleteAct(fecha,hora,act,obs){
   if(!confirm('¿Eliminar esta actividad?')) return;
-  db.ref(`maah_agenda/${currentUser.id}/${fecha}/${idx}`).remove(()=>{
-    _agendaDataCache = null; // Invalidar cache
+  const chatId=currentUser.tgid||TG_ADMIN_CHATID;
+  const inclFrase=document.getElementById('tg-frase').checked;
+  const d=new Date(fecha+'T12:00:00');
+  const msgElim=`🗑 <b>ACTIVIDAD ELIMINADA — AGENDA MAAH</b>\n`+
+    `👤 ${currentUser.nombre}\n`+
+    `❌ ${fmtDateLabel(d)} · ${hora} — ${act}${obs?' ('+obs+')':''}`;
+
+  const parts=fecha.split('-');
+  const da=+parts[2],mo=+parts[1];
+  const dateObj=new Date(+parts[0],mo-1,da,12,0,0);
+
+  Promise.all([
+    db.ref('maah_agenda/'+currentUser.id+'/'+fecha).once('value'),
+    db.ref('gantt_maah/actividades_por_usuario/'+currentUser.id).once('value')
+  ]).then(function(snaps){
+    const agendaData=snaps[0].val()||{};
+    const ganttData=snaps[1].val()||{};
+    const dels=[];
+    // Borrar de Agenda por hora+act
+    Object.entries(agendaData).forEach(function([k,v]){
+      if(v && v.hora===hora && v.act===act)
+        dels.push(db.ref('maah_agenda/'+currentUser.id+'/'+fecha+'/'+k).remove());
+    });
+    // Borrar de Gantt: puntual (agendaFecha+hora) o recurrente (aparece en esta fecha+hora)
+    Object.entries(ganttData).forEach(function([k,v]){
+      if(!v) return;
+      const isPuntual=v.agendaFecha===fecha && v.agendaHora===hora && !v.semanal && !v.mensual && !v.anual;
+      const isAnual=v.anual===true && v.dia===da && v.mes===mo-1 && v.agendaHora===hora;
+      const isMensual=v.mensual===true && v.dia===da && v.agendaHora===hora;
+      const isSemanal=v.semanal===true && (v.dow===dateObj.getDay()||v.diaSemana===dateObj.getDay()) && v.agendaHora===hora;
+      if(isPuntual||isAnual||isMensual||isSemanal)
+        dels.push(db.ref('gantt_maah/actividades_por_usuario/'+currentUser.id+'/'+k).remove());
+    });
+    return Promise.all(dels);
+  }).then(function(){
+    _agendaDataCache=null; _ganttDataCache=null;
     loadAgendaForDate(fecha);
-    const chatId=currentUser.tgid||TG_ADMIN_CHATID;
-    const inclFrase=document.getElementById('tg-frase').checked;
-    const d=new Date(fecha+'T12:00:00');
-    // Notificación separada de eliminación
-    const msgElim=`🗑 <b>ACTIVIDAD ELIMINADA — AGENDA MAAH</b>\n`+
-      `👤 ${currentUser.nombre}\n`+
-      `❌ ${fmtDateLabel(d)} · ${hora} — ${act}${obs?' ('+obs+')':''}`;
-    sendTG(chatId, msgElim, fecha+'_elim');
-    // Edita el mensaje principal con la agenda actualizada
-    setTimeout(()=>buildAndSendAgenda(fecha, chatId, inclFrase), 1000);
-  });
+    sendTG(chatId,msgElim,fecha+'_elim');
+    setTimeout(()=>buildAndSendAgenda(fecha,chatId,inclFrase),1000);
+  }).catch(function(e){console.warn('deleteAct error:',e);});
 }
 
 // NAV SEMANA
