@@ -1368,6 +1368,7 @@ body{font-family:'Times New Roman',Times,serif;background:#eef2f7;min-height:100
 </div>
 
 
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script>
@@ -2214,7 +2215,8 @@ function getRecurrentesParaFecha(fecha, ganttData){
     var isMensual=(g.mensual===true && g.dia===da);
     var isSemanal=(g.semanal===true && (g.dow===diaSemana || g.diaSemana===diaSemana));
     if(isAnual||isMensual||isSemanal){
-      items.push({hora:g.agendaHora||'08:00', act:g.act, obs:g.obs||''});
+      const _tipo=isAnual?'anual':isMensual?'mensual':'semanal';
+      items.push({hora:g.agendaHora||'08:00', act:g.act, obs:g.obs||'', _tipo});
     }
   });
   return items;
@@ -2689,6 +2691,12 @@ function renderAgendaOverview(refDate, currentDayActsCount, forceRepaint){
 // ── PANEL DE ACTIVIDADES (al hacer clic en un pill) ──────────
 let _resumenTipo = 'mes';
 let _resumenMesOffset = 0;
+let _resumenFiltros = {semanal:false, mensual:false, anual:false};
+
+function toggleResumenFiltro(tipo){
+  _resumenFiltros[tipo] = !_resumenFiltros[tipo];
+  showActsPanel(_resumenTipo, _resumenMesOffset);
+}
 
 function showActsPanel(tipo, mesOffset){
   if(!_agendaDataCache) return;
@@ -2733,11 +2741,13 @@ function showActsPanel(tipo, mesOffset){
   // Añadir fechas de agenda que caigan en el rango
   Object.keys(_agendaDataCache).forEach(k=>{if(todasFechas.has(k)&&_agendaDataCache[k]) todasFechas.add(k);});
 
-  // Combinar agenda + gantt recurrentes por fecha
+  // Combinar agenda + gantt recurrentes por fecha, aplicando filtros
+  const hayFiltro=_resumenFiltros.semanal||_resumenFiltros.mensual||_resumenFiltros.anual;
   const actsPorFecha={};
   todasFechas.forEach(fecha=>{
-    const agendaActs=(_agendaDataCache[fecha]?Object.values(_agendaDataCache[fecha]):[]).filter(a=>a&&a.act);
-    const ganttActs=_ganttDataCache?getRecurrentesParaFecha(fecha,_ganttDataCache):[];
+    const agendaActs=hayFiltro?[]:(_agendaDataCache[fecha]?Object.values(_agendaDataCache[fecha]):[]).filter(a=>a&&a.act);
+    const ganttActs=(_ganttDataCache?getRecurrentesParaFecha(fecha,_ganttDataCache):[])
+      .filter(a=>!hayFiltro||(_resumenFiltros[a._tipo]));
     const merged=[...agendaActs,...ganttActs].sort((a,b)=>(a.hora||'').localeCompare(b.hora||''));
     if(merged.length>0) actsPorFecha[fecha]=merged;
   });
@@ -2765,9 +2775,17 @@ function showActsPanel(tipo, mesOffset){
     });
   }
 
-  // Botones de navegación mes (solo para tipo='mes')
+  // Navegación mes + filtros de recurrencia
+  const chkStyle='display:flex;align-items:center;gap:3px;cursor:pointer;font-size:11px;background:rgba(255,255,255,0.15);padding:3px 7px;border-radius:10px;';
+  const chkActive='background:rgba(255,255,255,0.4);font-weight:700;';
+  const filtrosHTML=`
+    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px;">
+      <label style="${chkStyle}${_resumenFiltros.semanal?chkActive:''}"><input type="checkbox" ${_resumenFiltros.semanal?'checked':''} onchange="toggleResumenFiltro('semanal')" style="margin:0;"> Semanal</label>
+      <label style="${chkStyle}${_resumenFiltros.mensual?chkActive:''}"><input type="checkbox" ${_resumenFiltros.mensual?'checked':''} onchange="toggleResumenFiltro('mensual')" style="margin:0;"> Mensual</label>
+      <label style="${chkStyle}${_resumenFiltros.anual?chkActive:''}"><input type="checkbox" ${_resumenFiltros.anual?'checked':''} onchange="toggleResumenFiltro('anual')" style="margin:0;"> Anual</label>
+    </div>`;
   const navMes = tipo==='mes' ? `
-    <div style="display:flex;align-items:center;gap:6px;">
+    <div style="display:flex;align-items:center;gap:6px;margin-top:2px;">
       <button onclick="showActsPanel('mes',${_resumenMesOffset-1})" style="background:rgba(255,255,255,0.2);border:none;color:#fff;font-size:18px;cursor:pointer;padding:2px 8px;border-radius:4px;">‹</button>
       <span style="font-size:13px;opacity:0.9;">${mesLabel}</span>
       <button onclick="showActsPanel('mes',${_resumenMesOffset+1})" style="background:rgba(255,255,255,0.2);border:none;color:#fff;font-size:18px;cursor:pointer;padding:2px 8px;border-radius:4px;">›</button>
@@ -2787,6 +2805,7 @@ function showActsPanel(tipo, mesOffset){
         <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:0;">
           <span class="ov-acts-title">${titulos[tipo]}</span>
           ${navMes}
+          ${filtrosHTML}
         </div>
         <button class="ov-acts-close" onclick="document.getElementById('ov-acts-overlay').classList.remove('open')">×</button>
       </div>
@@ -2825,31 +2844,34 @@ function imprimirResumen(){
 
 function enviarResumenTG(){
   if(!currentUser) return;
-  const title = document.querySelector('.ov-acts-title');
-  const content = document.getElementById('ov-acts-body-content');
-  if(!content) return;
+  const panel = document.querySelector('.ov-acts-panel');
+  const titleEl = document.querySelector('.ov-acts-title');
+  if(!panel) return;
   const chatId = currentUser.tgid||TG_ADMIN_CHATID;
-  let msg = `📋 <b>RESUMEN MAAH — ${title?title.textContent.toUpperCase():''}</b>\n👤 ${currentUser.nombre}\n\n`;
-  const hdrs = content.querySelectorAll('.ov-acts-date-hdr');
-  const rows = content.querySelectorAll('.ov-acts-row');
-  if(hdrs.length===0 && rows.length===0){
-    msg += 'Sin actividades en este período.';
-  } else {
-    let lastHdr='';
-    content.querySelectorAll('.ov-acts-date-hdr,.ov-acts-row').forEach(el=>{
-      if(el.classList.contains('ov-acts-date-hdr')){
-        lastHdr=el.textContent.trim();
-        msg+='\n📅 <b>'+lastHdr+'</b>\n';
-      } else {
-        const t=el.querySelector('.ov-acts-time');
-        const n=el.querySelector('.ov-acts-name');
-        const o=el.querySelector('.ov-acts-obs');
-        msg+='  🕐 '+(t?t.textContent:'')+'  '+(n?n.textContent:'')+(o?' ('+o.textContent+')':'')+'\n';
-      }
-    });
+  const caption = (titleEl?titleEl.textContent:'Resumen MAAH')+' — '+currentUser.nombre;
+
+  if(typeof html2canvas === 'undefined'){
+    alert('La librería de captura no está disponible. Intenta recargar la página.');
+    return;
   }
-  sendTG(chatId, msg, 'resumen_'+Date.now());
-  alert('Resumen enviado a Telegram ✓');
+
+  // Capturar el panel como imagen y enviar a Telegram
+  html2canvas(panel, {scale:2, useCORS:true, backgroundColor:'#ffffff'}).then(canvas=>{
+    canvas.toBlob(blob=>{
+      if(!blob){ alert('Error al generar la imagen.'); return; }
+      const fd = new FormData();
+      fd.append('chat_id', chatId);
+      fd.append('photo', blob, 'resumen.png');
+      fd.append('caption', caption);
+      fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendPhoto`,{method:'POST',body:fd})
+        .then(r=>r.json())
+        .then(data=>{
+          if(data.ok){ alert('Resumen enviado a Telegram ✓'); }
+          else{ alert('Error Telegram: '+(data.description||'desconocido')); }
+        })
+        .catch(()=>alert('Error de conexión con Telegram.'));
+    },'image/png');
+  }).catch(()=>alert('Error al capturar la pantalla.'));
 }
 
 function renderTLDia(){
