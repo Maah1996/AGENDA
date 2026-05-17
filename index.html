@@ -1300,6 +1300,7 @@ body{font-family:'Times New Roman',Times,serif;background:#eef2f7;min-height:100
 <div class="modal-overlay" id="modal-edit-act">
   <div class="modal-box">
     <h3>✎ Editar actividad</h3>
+    <div class="mfg"><label>Fecha</label><input type="date" id="edit-act-fecha"></div>
     <div class="mfg"><label>Hora</label><input type="time" id="edit-act-hora"></div>
     <div class="mfg"><label>Actividad</label><input type="text" id="edit-act-desc" oninput="this.value=this.value.toUpperCase()"></div>
     <div class="mfg"><label>OBS</label><textarea id="edit-act-obs" rows="3" style="width:100%;font-size:12px;padding:7px 10px;border:1px solid #cbd5e0;border-radius:5px;color:#2d3748;font-family:'Times New Roman',Times,serif;background:#fffde7;resize:vertical;line-height:1.4;" oninput="this.value=this.value.toUpperCase()"></textarea></div>
@@ -3183,6 +3184,7 @@ function selectDay(fecha){
 function openEditAct(fecha,hora,act,obs){
   editingActKey=null; editingActGanttKey=null; editingActDate=fecha;
   editingActOld={hora,act,obs};
+  document.getElementById('edit-act-fecha').value=fecha;
   document.getElementById('edit-act-hora').value=hora;
   document.getElementById('edit-act-desc').value=act;
   document.getElementById('edit-act-obs').value=obs;
@@ -3224,6 +3226,7 @@ function openEditAct(fecha,hora,act,obs){
 }
 
 function saveEditAct(){
+  const nuevaFecha=document.getElementById('edit-act-fecha').value;
   const hora=document.getElementById('edit-act-hora').value;
   const act=document.getElementById('edit-act-desc').value.toUpperCase().trim();
   const obs=document.getElementById('edit-act-obs').value.toUpperCase().trim();
@@ -3232,21 +3235,29 @@ function saveEditAct(){
   const sendMensual=document.getElementById('edit-chk-mensual').checked;
   const sendAnual=document.getElementById('edit-chk-anual').checked;
   if(!act){alert('Ingrese una descripción.');return;}
+  if(!nuevaFecha){alert('Seleccione una fecha.');return;}
 
-  const [yr,mo,da]=editingActDate.split('-').map(Number);
+  const fechaDestino=nuevaFecha;
+  const [yr,mo,da]=fechaDestino.split('-').map(Number);
   const fechaLocal=new Date(yr,mo-1,da,12,0,0);
   const ganttRef=db.ref('gantt_maah/actividades_por_usuario/'+currentUser.id);
 
-  // 1. Actualizar entrada en Agenda
+  // 1. Actualizar entrada en Agenda (si cambió la fecha: borrar del origen y crear en destino)
   const priori=document.getElementById('edit-chk-priori').checked;
   const agendaEntry={hora,act,obs};
   if(priori) agendaEntry.priori=true;
-  const agendaPath=editingActKey!=null
-    ? db.ref('maah_agenda/'+currentUser.id+'/'+editingActDate+'/'+editingActKey)
-    : null;
-  const agendaWrite=agendaPath
-    ? agendaPath.set(agendaEntry)
-    : Promise.resolve();
+  let agendaWrite=Promise.resolve();
+  if(editingActKey!=null){
+    const origenPath=db.ref('maah_agenda/'+currentUser.id+'/'+editingActDate+'/'+editingActKey);
+    if(fechaDestino!==editingActDate){
+      // Mover: borrar del día original y crear en el nuevo
+      agendaWrite=origenPath.remove().then(()=>
+        db.ref('maah_agenda/'+currentUser.id+'/'+fechaDestino).push(agendaEntry)
+      );
+    } else {
+      agendaWrite=origenPath.set(agendaEntry);
+    }
+  }
 
   // 2. Actualizar / crear / borrar entrada en Gantt
   const anyGantt=sendGantt||sendSemanal||sendMensual||sendAnual;
@@ -3254,7 +3265,7 @@ function saveEditAct(){
   if(editingActGanttKey){
     if(anyGantt){
       const titulo=act+(obs?' · '+obs:'');
-      const upd={act:titulo,obs:obs,agendaHora:hora,agendaFecha:editingActDate,fromAgenda:true};
+      const upd={act:titulo,obs:obs,agendaHora:hora,agendaFecha:fechaDestino,fromAgenda:true};
       upd.freq=sendAnual?'anual':sendMensual?'mensual':sendSemanal?'semanal':'puntual';
       upd.anual=sendAnual||null; upd.mensual=sendMensual||null; upd.semanal=sendSemanal||null;
       upd.dia=(sendAnual||sendMensual)?da:null;
@@ -3272,7 +3283,7 @@ function saveEditAct(){
       const id=maxId+1;
       const titulo=act+(obs?' · '+obs:'');
       const reg={id,act:titulo,obs,type:'revision',fecha:fechaLocal.toISOString(),
-        fromAgenda:true,agendaFecha:editingActDate,agendaHora:hora};
+        fromAgenda:true,agendaFecha:fechaDestino,agendaHora:hora};
       reg.freq=sendAnual?'anual':sendMensual?'mensual':sendSemanal?'semanal':'puntual';
       if(sendAnual){reg.anual=true;reg.dia=da;reg.mes=mo-1;}
       if(sendMensual){reg.mensual=true;reg.dia=da;}
@@ -3284,12 +3295,13 @@ function saveEditAct(){
   Promise.all([agendaWrite,ganttWrite]).then(()=>{
     _agendaDataCache=null; _ganttDataCache=null;
     closeModal('modal-edit-act');
-    loadAgendaForDate(editingActDate);
-    // Solo enviar a Telegram si la fecha editada es hoy
-    if(editingActDate===fmtDateKey(new Date())){
+    loadAgendaForDate(fechaDestino);
+    // Solo enviar a Telegram si la fecha destino es hoy
+    const hoy=fmtDateKey(new Date());
+    if(fechaDestino===hoy || (fechaDestino!==editingActDate && editingActDate===hoy)){
       const chatId=currentUser.tgid||TG_ADMIN_CHATID;
       const inclFrase=document.getElementById('tg-frase').checked;
-      buildAndSendAgenda(editingActDate,chatId,inclFrase);
+      buildAndSendAgenda(hoy,chatId,inclFrase);
     }
   }).catch(e=>console.warn('saveEditAct error:',e));
 }
