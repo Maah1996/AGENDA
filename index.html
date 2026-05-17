@@ -3282,12 +3282,13 @@ function saveEditAct(){
   if(editingActGanttKey){
     if(anyGantt){
       const titulo=act+(obs?' · '+obs:'');
-      const upd={act:titulo,obs:obs,agendaHora:hora,agendaFecha:fechaDestino,fromAgenda:true};
+      const upd={act:titulo,obs:obs,agendaHora:hora,agendaFecha:fechaDestino,fecha:fechaLocal.toISOString(),fromAgenda:true};
       upd.freq=sendAnual?'anual':sendMensual?'mensual':sendSemanal?'semanal':'puntual';
       upd.anual=sendAnual||null; upd.mensual=sendMensual||null; upd.semanal=sendSemanal||null;
       upd.dia=(sendAnual||sendMensual)?da:null;
       upd.mes=sendAnual?(mo-1):null;
       upd.dow=sendSemanal?fechaLocal.getDay():null;
+      upd.diaSemana=sendSemanal?fechaLocal.getDay():null;
       ganttWrite=ganttRef.child(editingActGanttKey).update(upd);
     } else {
       ganttWrite=ganttRef.child(editingActGanttKey).remove();
