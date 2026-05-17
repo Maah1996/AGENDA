@@ -916,10 +916,11 @@ body{font-family:'Times New Roman',Times,serif;background:#eef2f7;min-height:100
           <input type="date" id="agenda-fecha">
         </div>
         <table class="acts-table">
-          <thead><tr><th>Hora</th><th>Actividad</th><th>OBS</th><th title="Enviar a Carta Gantt" style="width:54px;text-align:center;">GANTT</th><th title="Repetir cada semana" style="width:54px;text-align:center;">SEMANAL</th><th title="Repetir cada mes" style="width:54px;text-align:center;">MENSUAL</th><th title="Repetir cada año" style="width:54px;text-align:center;">ANUAL</th><th></th></tr></thead>
+          <thead><tr><th>Hora</th><th>Actividad</th><th>OBS</th><th title="Marcar como prioritaria — se resalta en Telegram el día de la actividad" style="width:54px;text-align:center;color:#c62828;">PRIORI.</th><th title="Enviar a Carta Gantt" style="width:54px;text-align:center;">GANTT</th><th title="Repetir cada semana" style="width:54px;text-align:center;">SEMANAL</th><th title="Repetir cada mes" style="width:54px;text-align:center;">MENSUAL</th><th title="Repetir cada año" style="width:54px;text-align:center;">ANUAL</th><th></th></tr></thead>
           <tbody id="acts-body"><tr><td><input type="time" value="08:00"></td>
     <td><input type="text" placeholder="Actividad..." oninput="this.value=this.value.toUpperCase()"></td>
     <td class="obs-td"><textarea placeholder="OBS..." rows="1" oninput="this.value=this.value.toUpperCase();autoGrow(this);" onkeydown="if(event.key===&#39;Enter&#39;){event.stopPropagation();}"></textarea></td>
+    <td class="chk-cell"><input type="checkbox" class="chk-priori" title="Marcar como prioritaria" style="accent-color:#c62828;"></td>
     <td class="chk-cell"><input type="checkbox" class="chk-gantt" title="Enviar a Carta Gantt (puntual)" onchange="onChkGanttChange(this)"></td>
     <td class="chk-cell"><input type="checkbox" class="chk-semanal" title="Repetir cada semana" onchange="onChkSemanalChange(this)"></td>
     <td class="chk-cell"><input type="checkbox" class="chk-mensual" title="Repetir cada mes" onchange="onChkMensualChange(this)"></td>
@@ -1303,6 +1304,7 @@ body{font-family:'Times New Roman',Times,serif;background:#eef2f7;min-height:100
     <div class="mfg"><label>Actividad</label><input type="text" id="edit-act-desc" oninput="this.value=this.value.toUpperCase()"></div>
     <div class="mfg"><label>OBS</label><textarea id="edit-act-obs" rows="3" style="width:100%;font-size:12px;padding:7px 10px;border:1px solid #cbd5e0;border-radius:5px;color:#2d3748;font-family:'Times New Roman',Times,serif;background:#fffde7;resize:vertical;line-height:1.4;" oninput="this.value=this.value.toUpperCase()"></textarea></div>
     <div class="mfg" style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;padding:6px 0;">
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:12px;color:#c62828;font-weight:700;"><input type="checkbox" id="edit-chk-priori" style="accent-color:#c62828;"> PRIORI.</label>
       <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:12px;"><input type="checkbox" id="edit-chk-gantt"> GANTT</label>
       <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:12px;"><input type="checkbox" id="edit-chk-semanal"> SEMANAL</label>
       <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:12px;"><input type="checkbox" id="edit-chk-mensual"> MENSUAL</label>
@@ -2033,6 +2035,7 @@ function addActRow(){
   tr.innerHTML=`<td><input type="time" value="08:00"></td>
     <td><input type="text" placeholder="Actividad..." oninput="this.value=this.value.toUpperCase()"></td>
     <td class="obs-td"><textarea placeholder="OBS..." rows="1" oninput="this.value=this.value.toUpperCase();autoGrow(this);" onkeydown="if(event.key==='Enter'){event.stopPropagation();}"></textarea></td>
+    <td class="chk-cell"><input type="checkbox" class="chk-priori" title="Marcar como prioritaria" style="accent-color:#c62828;"></td>
     <td class="chk-cell"><input type="checkbox" class="chk-gantt" title="Enviar a Carta Gantt (puntual)" onchange="onChkGanttChange(this)"></td>
     <td class="chk-cell"><input type="checkbox" class="chk-semanal" title="Repetir cada semana" onchange="onChkSemanalChange(this)"></td>
     <td class="chk-cell"><input type="checkbox" class="chk-mensual" title="Repetir cada mes" onchange="onChkMensualChange(this)"></td>
@@ -2091,6 +2094,7 @@ function guardarAgenda(){
   // Leemos cada fila completa para conocer también los flags Gantt/Anual.
   const rowData=rows.map(r=>{
     const ins=r.querySelectorAll('input, textarea');
+    const chkP=r.querySelector('.chk-priori');
     const chkG=r.querySelector('.chk-gantt');
     const chkA=r.querySelector('.chk-anual');
     const chkS=r.querySelector('.chk-semanal');
@@ -2099,6 +2103,7 @@ function guardarAgenda(){
       hora:ins[0].value,
       act:(ins[1].value||'').toUpperCase().trim(),
       obs:(ins[2].value||'').toUpperCase().trim(),
+      priori:      !!(chkP && chkP.checked),
       sendGantt:   !!(chkG && chkG.checked),
       sendAnual:   !!(chkA && chkA.checked),
       sendSemanal: !!(chkS && chkS.checked),
@@ -2107,8 +2112,8 @@ function guardarAgenda(){
   }).filter(a=>a.act);
   if(!rowData.length){alert('Ingrese al menos una actividad.');return;}
 
-  // Las que van a la agenda guardan sólo {hora, act, obs} (formato existente intacto).
-  const newActs=rowData.map(a=>({hora:a.hora, act:a.act, obs:a.obs}));
+  // Las que van a la agenda guardan {hora, act, obs} + priori si está marcado.
+  const newActs=rowData.map(a=>{const o={hora:a.hora,act:a.act,obs:a.obs};if(a.priori)o.priori=true;return o;});
   // Las que van a la Gantt llevan los flags; se sincronizan después de guardar la agenda.
   const ganttActs=rowData.filter(a=>a.sendGantt||a.sendSemanal||a.sendMensual||a.sendAnual);
 
@@ -3130,7 +3135,7 @@ function openEditAct(fecha,hora,act,obs){
   document.getElementById('edit-act-hora').value=hora;
   document.getElementById('edit-act-desc').value=act;
   document.getElementById('edit-act-obs').value=obs;
-  ['edit-chk-gantt','edit-chk-semanal','edit-chk-mensual','edit-chk-anual'].forEach(id=>{
+  ['edit-chk-priori','edit-chk-gantt','edit-chk-semanal','edit-chk-mensual','edit-chk-anual'].forEach(id=>{
     document.getElementById(id).checked=false;
   });
   // Buscar en Gantt para pre-marcar los checkboxes
@@ -3153,11 +3158,14 @@ function openEditAct(fecha,hora,act,obs){
         document.getElementById('edit-chk-anual').checked=!!v.anual;
       }
     });
-    // Buscar clave en agenda por hora+act
+    // Buscar clave en agenda por hora+act y cargar priori
     db.ref('maah_agenda/'+currentUser.id+'/'+fecha).once('value',snapA=>{
       const ad=snapA.val()||{};
       Object.entries(ad).forEach(([k,v])=>{
-        if(v && v.hora===hora && v.act===act) editingActKey=k;
+        if(v && v.hora===hora && v.act===act){
+          editingActKey=k;
+          document.getElementById('edit-chk-priori').checked=!!(v.priori);
+        }
       });
     });
   });
@@ -3179,7 +3187,9 @@ function saveEditAct(){
   const ganttRef=db.ref('gantt_maah/actividades_por_usuario/'+currentUser.id);
 
   // 1. Actualizar entrada en Agenda
+  const priori=document.getElementById('edit-chk-priori').checked;
   const agendaEntry={hora,act,obs};
+  if(priori) agendaEntry.priori=true;
   const agendaPath=editingActKey!=null
     ? db.ref('maah_agenda/'+currentUser.id+'/'+editingActDate+'/'+editingActKey)
     : null;
@@ -3233,13 +3243,6 @@ function saveEditAct(){
 // ELIMINAR ACTIVIDAD
 function deleteAct(fecha,hora,act,obs){
   if(!confirm('¿Eliminar esta actividad?')) return;
-  const chatId=currentUser.tgid||TG_ADMIN_CHATID;
-  const inclFrase=document.getElementById('tg-frase').checked;
-  const d=new Date(fecha+'T12:00:00');
-  const msgElim=`🗑 <b>ACTIVIDAD ELIMINADA — AGENDA MAAH</b>\n`+
-    `👤 ${currentUser.nombre}\n`+
-    `❌ ${fmtDateLabel(d)} · ${hora} — ${act}${obs?' ('+obs+')':''}`;
-
   const parts=fecha.split('-');
   const da=+parts[2],mo=+parts[1];
   const dateObj=new Date(+parts[0],mo-1,da,12,0,0);
@@ -3256,13 +3259,14 @@ function deleteAct(fecha,hora,act,obs){
       if(v && v.hora===hora && v.act===act)
         dels.push(db.ref('maah_agenda/'+currentUser.id+'/'+fecha+'/'+k).remove());
     });
-    // Borrar de Gantt: puntual (agendaFecha+hora) o recurrente (aparece en esta fecha+hora)
+    // Borrar de Gantt: puntual o recurrente
     Object.entries(ganttData).forEach(function([k,v]){
       if(!v) return;
-      const isPuntual=v.agendaFecha===fecha && v.agendaHora===hora && !v.semanal && !v.mensual && !v.anual;
-      const isAnual=v.anual===true && v.dia===da && v.mes===mo-1 && v.agendaHora===hora;
-      const isMensual=v.mensual===true && v.dia===da && v.agendaHora===hora;
-      const isSemanal=v.semanal===true && (v.dow===dateObj.getDay()||v.diaSemana===dateObj.getDay()) && v.agendaHora===hora;
+      const vHora=v.agendaHora||v.hora||'08:00';
+      const isPuntual=v.agendaFecha===fecha && vHora===hora && !v.semanal && !v.mensual && !v.anual;
+      const isAnual=v.anual===true && v.dia===da && v.mes===mo-1 && vHora===hora;
+      const isMensual=v.mensual===true && v.dia===da && vHora===hora;
+      const isSemanal=v.semanal===true && (v.dow===dateObj.getDay()||v.diaSemana===dateObj.getDay()) && vHora===hora;
       if(isPuntual||isAnual||isMensual||isSemanal)
         dels.push(db.ref('gantt_maah/actividades_por_usuario/'+currentUser.id+'/'+k).remove());
     });
@@ -3270,8 +3274,6 @@ function deleteAct(fecha,hora,act,obs){
   }).then(function(){
     _agendaDataCache=null; _ganttDataCache=null;
     loadAgendaForDate(fecha);
-    sendTG(chatId,msgElim,fecha+'_elim');
-    setTimeout(()=>buildAndSendAgenda(fecha,chatId,inclFrase),1000);
   }).catch(function(e){console.warn('deleteAct error:',e);});
 }
 
@@ -3628,6 +3630,18 @@ function buildAndSendAgenda(fecha, chatId, inclFrase){
     // Título estilo sheet: AGENDA PARA EL DÍA en negrita
     let msg=`📅 <b>AGENDA PARA EL DÍA:\n${dias[d.getDay()]} ${d.getDate()} DE ${meses[d.getMonth()]} DEL ${d.getFullYear()}</b>\n\n`;
 
+    // Bloque de prioridades al inicio
+    const prioriActs=acts.filter(a=>a.priori);
+    if(prioriActs.length){
+      msg+=`🚨 <b>PRIORIDAD HOY:</b>\n`;
+      prioriActs.forEach(a=>{
+        msg+=`⭐ <b>${a.hora}</b> — ${a.act}`;
+        if(a.obs) msg+=` <i>(${a.obs})</i>`;
+        msg+='\n';
+      });
+      msg+='\n';
+    }
+
     if(!acts.length){
       msg+='✅ NO HAY ACTIVIDADES HOY.\n';
     } else {
@@ -3638,11 +3652,9 @@ function buildAndSendAgenda(fecha, chatId, inclFrase){
       });
     }
 
-    if(inclFrase){
-      msg+='\n──────────────────\n';
-      msg+=`📖 <i>${proverbio}</i>\n\n`;
-      msg+=`🧠 <i>${estoica.replace(/<[^>]+>/g,'')}</i>`;
-    }
+    msg+='\n──────────────────\n';
+    msg+=`📖 <i>${proverbio}</i>\n\n`;
+    msg+=`🧠 <i>${estoica.replace(/<[^>]+>/g,'')}</i>`;
 
     sendOrEditTG(chatId, msg, fecha);
   });
