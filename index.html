@@ -1490,7 +1490,24 @@ function updateClock(){
     } catch(e){ tzEl.textContent = ''; }
   }
 }
-setInterval(updateClock,1000);
+let _tgAutoLastSent='';
+setInterval(()=>{
+  updateClock();
+  // Envío automático diario: chequea cada minuto si es la hora configurada
+  const autoChk=document.getElementById('tg-auto');
+  const horaChk=document.getElementById('tg-hora');
+  if(!autoChk||!horaChk||!autoChk.checked||!currentUser) return;
+  const now=new Date();
+  const hhmm=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  const hoy=fmtDateKey(now);
+  const key=hoy+'_'+hhmm;
+  if(hhmm===horaChk.value && key!==_tgAutoLastSent){
+    _tgAutoLastSent=key;
+    const chatId=currentUser.tgid||TG_ADMIN_CHATID;
+    const inclFrase=document.getElementById('tg-frase').checked;
+    buildAndSendAgenda(hoy, chatId, inclFrase);
+  }
+},1000);
 
 // ── CLIMA ─────────────────────────────────────────────────────
 const CLIMA_ICONS={'0':'☀️','1':'🌤','2':'⛅','3':'☁️','45':'🌫','48':'🌫','51':'🌦','53':'🌦','55':'🌧','61':'🌧','63':'🌧','65':'🌧','71':'🌨','73':'❄️','75':'❄️','77':'🌨','80':'🌦','81':'🌧','82':'⛈','85':'🌨','86':'❄️','95':'⛈','96':'⛈','99':'⛈'};
@@ -3630,9 +3647,9 @@ function buildAndSendAgenda(fecha, chatId, inclFrase){
     // Título estilo sheet: AGENDA PARA EL DÍA en negrita
     let msg=`📅 <b>AGENDA PARA EL DÍA:\n${dias[d.getDay()]} ${d.getDate()} DE ${meses[d.getMonth()]} DEL ${d.getFullYear()}</b>\n\n`;
 
-    // Bloque de prioridades al inicio
+    // Bloque de prioridades solo si la fecha ES hoy
     const prioriActs=acts.filter(a=>a.priori);
-    if(prioriActs.length){
+    if(prioriActs.length && fecha===fmtDateKey(new Date())){
       msg+=`🚨 <b>PRIORIDAD HOY:</b>\n`;
       prioriActs.forEach(a=>{
         msg+=`⭐ <b>${a.hora}</b> — ${a.act}`;
