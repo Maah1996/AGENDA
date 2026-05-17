@@ -1525,12 +1525,16 @@ setInterval(()=>{
       const dias=['DOMINGO','LUNES','MARTES','MIÉRCOLES','JUEVES','VIERNES','SÁBADO'];
       const meses=['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
       const d=new Date(hoy+'T12:00:00');
+      const {proverbio,estoica}=getFrasesHoy();
       let msg=`🚨 <b>ACTIVIDADES PRIORITARIAS HOY:\n${dias[d.getDay()]} ${d.getDate()} DE ${meses[d.getMonth()]} DEL ${d.getFullYear()}</b>\n\n`;
       prioriActs.forEach(a=>{
         msg+=`⭐ <b>${a.hora}</b> — ${a.act}`;
         if(a.obs) msg+=` <i>(${a.obs})</i>`;
         msg+='\n';
       });
+      msg+='\n──────────────────\n';
+      msg+=`📖 <i>${proverbio}</i>\n\n`;
+      msg+=`🧠 <i>${estoica.replace(/<[^>]+>/g,'')}</i>`;
       sendTG(chatId, msg, hoy+'_priori');
     });
   }
