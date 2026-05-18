@@ -1988,14 +1988,15 @@ function startApp(){
   }
   mostrarFrases();
   loadClima();
-  // Efemérides y Telegram solo para admin
+  // Efemérides solo para admin; Telegram para admin o cualquier usuario con tgid
   const esAdmin=currentUser&&currentUser.rol==='admin';
+  const tieneTG=esAdmin||!!(currentUser&&currentUser.tgid);
   const _efemEl=document.querySelector('.efem-card');
   const _tgRowEl=document.querySelector('.tg-toggle-row');
   const _tgColEl=document.getElementById('tg-collapsible');
   if(_efemEl) _efemEl.style.display=esAdmin?'':'none';
-  if(_tgRowEl) _tgRowEl.style.display=esAdmin?'':'none';
-  if(_tgColEl && !esAdmin) _tgColEl.style.display='none';
+  if(_tgRowEl) _tgRowEl.style.display=tieneTG?'':'none';
+  if(_tgColEl && !tieneTG) _tgColEl.style.display='none';
   if(esAdmin) try{
     if(typeof renderEfemeride==='function') renderEfemeride();
     else document.getElementById('efem-texto').textContent='[Error: módulo no cargado]';
@@ -3542,6 +3543,7 @@ function abrirResumenModal(periodo){
       <div class="resumen-modal-body" id="resumen-modal-body">
         <div class="rm-empty">Cargando actividades...</div>
       </div>
+      <div id="resumen-modal-footer" style="padding:10px 16px;border-top:1px solid #e2e8f0;text-align:right;"></div>
     </div>
   `;
   ov.classList.add('open');
@@ -3604,10 +3606,47 @@ function abrirResumenModal(periodo){
     }
 
     body.innerHTML = html;
+    // Botón Telegram si el usuario tiene tgid
+    const footer = document.getElementById('resumen-modal-footer');
+    const _tieneTG = currentUser && (currentUser.tgid || currentUser.rol==='admin');
+    if(footer && _tieneTG && totalActs > 0){
+      _resumenTGCache = {periodo, dias, tituloPeriodo};
+      footer.innerHTML = '<button class="btn-tg" onclick="enviarResumenTG()">✈ Enviar a Telegram</button>';
+    }
   }).catch(err=>{
     const body = document.getElementById('resumen-modal-body');
     if(body) body.innerHTML = '<div class="rm-empty">Error al cargar actividades: ' + err.message + '</div>';
   });
+}
+
+var _resumenTGCache = null;
+function enviarResumenTG(){
+  if(!_resumenTGCache || !currentUser) return;
+  const chatId = currentUser.tgid || TG_ADMIN_CHATID;
+  const {periodo, dias, tituloPeriodo} = _resumenTGCache;
+  const emojis = ['🔴','🟠','🟡','🟢','🔵','🟣','⚫'];
+  const DIA_L = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const MES_A = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  let msg = `📅 <b>${tituloPeriodo.toUpperCase()}</b>\n\n`;
+  let total = 0;
+  dias.forEach(d=>{
+    if(!d.acts.length) return;
+    const dn = d.fecha;
+    msg += `<b>${DIA_L[dn.getDay()]} ${dn.getDate()} de ${MES_A[dn.getMonth()]}:</b>\n`;
+    d.acts.forEach((a,i)=>{
+      total++;
+      msg += `  ${emojis[i%emojis.length]} ${a.hora} — ${a.act}`;
+      if(a.obs) msg += ` <i>(${a.obs})</i>`;
+      if(a.priori) msg += ' ⚑';
+      msg += '\n';
+    });
+    msg += '\n';
+  });
+  if(total === 0) msg += '✅ No hay actividades en este período.\n';
+  const ref = dias.find(d=>d.acts.length);
+  const key = (ref ? fmtDateKey(ref.fecha) : fmtDateKey(new Date())) + '_' + periodo;
+  sendTG(chatId, msg, key);
+  cerrarResumenModal();
 }
 
 function cerrarResumenModal(){
