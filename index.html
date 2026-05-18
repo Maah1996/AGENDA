@@ -249,6 +249,11 @@ body{font-family:'Times New Roman',Times,serif;background:#eef2f7;min-height:100
 .mc.dot::after{content:'';display:block;width:4px;height:4px;border-radius:50%;background:#1a3f6f;margin:1px auto 0;}
 .mc.active::after{background:#fff;}
 .mc.empty{border-color:transparent;cursor:default;}
+.mc.priori:not(.active){background:#fff3e0;border-color:#ffcc80;}
+.mc.priori:not(.active) .mn{color:#e65100;font-weight:800;}
+.mc.priori.dot::after{background:#e65100;}
+.mc.active.priori::after{background:#ffcc80;}
+.tl-priori{border-left:3px solid #e65100 !important;background:#fff8f0 !important;}
 .timeline{position:relative;}
 .tl-item{display:flex;gap:9px;margin-bottom:12px;position:relative;}
 .tl-item::before{content:'';position:absolute;left:16px;top:32px;bottom:-12px;width:2px;background:#e2e8f0;}
@@ -2288,6 +2293,7 @@ function sincronizarAGantt(fecha, items){
         agendaFecha:fecha,
         agendaHora:a.hora||''
       };
+      if(a.priori) reg.priori=true;
       if(a.sendAnual){
         reg.freq='anual';
         reg.anual=true;
@@ -3190,7 +3196,8 @@ function renderTLMes(){
       var d=r.d, data=r.data;
       var key=fmtDateKey(d);
       var hasRec=getRecurrentesParaFecha(key,ganttData).length>0;
-      var cls='mc'+(key===fmtDateKey(tlCurrent)?' active':(data||hasRec)?' has dot':'');
+      var hasPriori=data&&Object.values(data).some(function(a){return a&&a.priori;});
+      var cls='mc'+(key===fmtDateKey(tlCurrent)?' active':(data||hasRec)?' has dot':'')+(hasPriori?' priori':'');
       grid+='<div class="'+cls+'" onclick="selectDay(\''+key+'\')"><span class="mn">'+d.getDate()+'</span></div>';
     });
     grid+='</div>';
@@ -3219,8 +3226,8 @@ function renderTimeline(fecha,acts,showDay){
         <div class="tl-circle" style="background:${col};">${a.hora}</div>
         <div class="tl-ampm">${ampm}</div>
       </div>
-      <div class="tl-card-item">
-        <h4>${a.act}</h4>
+      <div class="tl-card-item${a.priori?' tl-priori':''}">
+        <h4>${a.priori?'⚑ ':''}${a.act}</h4>
         <div class="meta">${a.hora}</div>
         ${a.obs?`<div class="obs-tag">${a.obs}</div>`:''}
         <div class="tl-actions">
@@ -3245,8 +3252,8 @@ function renderTimelineMulti(acts){
         <div class="tl-circle" style="background:${col};">${a.hora}</div>
         <div class="tl-ampm">${ampm}</div>
       </div>
-      <div class="tl-card-item">
-        <h4>${a.act} <span style="font-size:9px;color:#718096;font-weight:400;">— ${a.dia}</span></h4>
+      <div class="tl-card-item${a.priori?' tl-priori':''}">
+        <h4>${a.priori?'⚑ ':''}${a.act} <span style="font-size:9px;color:#718096;font-weight:400;">— ${a.dia}</span></h4>
         <div class="meta">${a.hora}</div>
         ${a.obs?`<div class="obs-tag">${a.obs}</div>`:''}
         <div class="tl-actions">
