@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <!-- saved from url=(0034)https://maah1996.github.io/Agenda/ -->
 <html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
@@ -1991,7 +1991,7 @@ function startApp(){
   if(_efemEl) _efemEl.style.display=esAdmin?'':'none';
   if(_tgRowEl) _tgRowEl.style.display=esAdmin?'':'none';
   if(_tgColEl && !esAdmin) _tgColEl.style.display='none';
-  if(esAdmin) renderEfemeride();
+  if(esAdmin) try{ renderEfemeride(); }catch(e){ console.warn('Efemerides:',e); }
   const hoy=fmtDateKey(TODAY);
   document.getElementById('agenda-fecha').value=hoy;
   addActRow();
@@ -4962,6 +4962,11 @@ db.ref('maah_usuarios').once('value',snap=>{
   if(!snap.exists()) db.ref('maah_usuarios').push({nombre:'ADMIN',pass:'1996',rol:'admin',tgid:TG_ADMIN_CHATID});
 });
 
+
+</script>
+
+<!-- Efemérides — script aislado para no afectar login -->
+<script>
 // ── EFEMÉRIDES ────────────────────────────────────────────────
 function toggleTgBox(){
   const c=document.getElementById('tg-collapsible');
