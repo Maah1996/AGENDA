@@ -51,6 +51,9 @@ body{font-family:'Times New Roman',Times,serif;background:#eef2f7;min-height:100
 .cb-date{font-size:12px;color:#5F5E5A;font-weight:600;margin-left:2px;}
 .cb-btn-change{background:#1a3f6f;border:none;border-radius:20px;padding:6px 16px;font-size:11px;color:#fff;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-family:inherit;margin-left:10px;transition:all .15s;letter-spacing:0.3px;box-shadow:0 2px 8px rgba(26,63,111,.25);}
 .cb-btn-change:hover{background:#15325a;box-shadow:0 4px 12px rgba(26,63,111,.35);transform:translateY(-1px);}
+.cb-btn-gps{background:#0F6E56;border:none;border-radius:20px;padding:6px 14px;font-size:11px;color:#fff;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;font-family:inherit;margin-left:6px;transition:all .15s;letter-spacing:0.3px;box-shadow:0 2px 8px rgba(15,110,86,.25);}
+.cb-btn-gps:hover{background:#0a5240;transform:translateY(-1px);}
+.cb-gps-auto{font-size:10px;color:#0F6E56;font-weight:700;margin-left:6px;background:#e1f5ee;padding:2px 8px;border-radius:10px;display:none;}
 .cb-btn-reset{background:#0F6E56;border:none;border-radius:6px;padding:4px 9px;font-size:12px;color:#fff;cursor:pointer;font-weight:700;font-family:inherit;margin-left:4px;}
 .cb-btn-reset:hover{background:#0a5642;}
 
@@ -760,6 +763,8 @@ body{font-family:'Times New Roman',Times,serif;background:#eef2f7;min-height:100
         <span class="cb-pin">📍</span>
         <span class="cb-city-name" id="cb-city-name">Santiago de Chile, Chile</span>
         <button class="cb-btn-change" onclick="abrirModalCiudad()">🌍 Elegir ciudad</button>
+        <button class="cb-btn-gps" id="cb-btn-gps" onclick="detectarUbicacionAuto(true)" title="Detectar mi ubicación actual automáticamente">📍 Detectar</button>
+        <span class="cb-gps-auto" id="cb-gps-auto">● AUTO</span>
         <button class="cb-btn-reset" id="cb-btn-reset" onclick="climaResetCity()" style="" title="Volver a Punta Arenas">↩</button>
         <span class="cb-date" id="cb-date">· Miércoles 6 de mayo</span>
       </div>
@@ -1880,6 +1885,9 @@ function buscarCiudad(query){
 function climaSetCity(name, lat, lon, tz){
   climaCiudad = { name, lat, lon, tz };
   try{ localStorage.setItem('maah_clima_ciudad', JSON.stringify(climaCiudad)); }catch(e){}
+  try{ localStorage.setItem('maah_ciudad_manual','true'); }catch(e){}
+  const autoTag = document.getElementById('cb-gps-auto');
+  if(autoTag) autoTag.style.display = 'none';
   cerrarModalCiudad();
   loadClima();
 }
@@ -1887,8 +1895,54 @@ function climaSetCity(name, lat, lon, tz){
 function climaResetCity(){
   climaCiudad = CIUDAD_DEFAULT;
   try{ localStorage.removeItem('maah_clima_ciudad'); }catch(e){}
+  try{ localStorage.removeItem('maah_ciudad_manual'); }catch(e){}
+  const autoTag = document.getElementById('cb-gps-auto');
+  if(autoTag) autoTag.style.display = 'none';
   cerrarModalCiudad();
-  loadClima();
+  detectarUbicacionAuto();
+}
+
+function detectarUbicacionAuto(forzar){
+  const manual = localStorage.getItem('maah_ciudad_manual') === 'true';
+  if(!forzar && manual){ loadClima(); return; }
+  if(!navigator.geolocation){
+    if(forzar) alert('Tu navegador no soporta geolocalización.');
+    else loadClima();
+    return;
+  }
+  const gpsBtn = document.getElementById('cb-btn-gps');
+  if(gpsBtn) gpsBtn.textContent = '⏳';
+  navigator.geolocation.getCurrentPosition(
+    async function(pos){
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      try{
+        const resp = await fetch('https://nominatim.openstreetmap.org/reverse?lat='+lat+'&lon='+lon+'&format=json&accept-language=es');
+        const data = await resp.json();
+        const addr = data.address || {};
+        const ciudad = addr.city || addr.town || addr.village || addr.county || 'Ubicación actual';
+        const pais = addr.country || '';
+        const nombre = ciudad + (pais ? ', '+pais : '');
+        climaCiudad = { name: nombre, lat, lon, tz };
+        try{ localStorage.setItem('maah_clima_ciudad', JSON.stringify(climaCiudad)); }catch(e){}
+        try{ localStorage.removeItem('maah_ciudad_manual'); }catch(e){}
+        const autoTag = document.getElementById('cb-gps-auto');
+        if(autoTag) autoTag.style.display = '';
+        if(gpsBtn) gpsBtn.textContent = '📍 Detectar';
+        loadClima();
+      }catch(e){
+        if(gpsBtn) gpsBtn.textContent = '📍 Detectar';
+        loadClima();
+      }
+    },
+    function(){
+      if(forzar) alert('No se pudo obtener la ubicación.\nVerifica los permisos en tu navegador.');
+      if(gpsBtn) gpsBtn.textContent = '📍 Detectar';
+      loadClima();
+    },
+    { timeout:10000, maximumAge:300000 }
+  );
 }
 
 // ── ESTADO ───────────────────────────────────────────────────
@@ -1998,7 +2052,7 @@ function startApp(){
     setTimeout(renderGastosDashboard, 500);
   }
   mostrarFrases();
-  loadClima();
+  detectarUbicacionAuto();
   // Efemérides y Telegram (desplegable) solo para admin
   const esAdmin=currentUser&&currentUser.rol==='admin';
   const _efemEl=document.querySelector('.efem-card');
