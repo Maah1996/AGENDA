@@ -415,23 +415,30 @@ body{font-family:'Times New Roman',Times,serif;background:#eef2f7;min-height:100
 .btn-save-m{background:#1a3f6f;color:#fff;}
 
 /* ADMIN */
-.admin-grid{display:grid;grid-template-columns:300px 1fr;gap:16px;}
-.admin-card{background:#fff;border-radius:10px;border:0.5px solid #dde3ed;padding:14px;}
+.admin-grid{display:grid;grid-template-columns:280px 1fr;gap:20px;}
+.admin-card{background:#fff;border-radius:14px;border:none;padding:20px;box-shadow:0 2px 12px rgba(26,63,111,0.08);}
 .fg{margin-bottom:9px;}
 .fg label{display:block;font-size:10px;color:#4a5568;margin-bottom:3px;font-weight:600;}
 .fg input,.fg select{width:100%;font-size:11px;padding:6px 9px;border:1px solid #cbd5e0;border-radius:5px;color:#2d3748;background:#fff;}
 .fg input:focus,.fg select:focus{outline:none;border-color:#1a3f6f;}
 .btn-primary{width:100%;padding:9px;font-size:12px;font-weight:700;background:#1a3f6f;color:#fff;border:none;border-radius:5px;cursor:pointer;margin-top:5px;}
-.user-list-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:7px;border:0.5px solid #dde3ed;margin-bottom:6px;background:#f7fafc;}
-.user-avatar{width:32px;height:32px;border-radius:50%;background:#1a3f6f;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
-.user-avatar.adm{background:#c8960a;}
+.user-list-item{display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:12px;border:none;margin-bottom:10px;background:#fff;box-shadow:0 2px 8px rgba(26,63,111,0.07);transition:box-shadow 0.2s;}
+.user-list-item:hover{box-shadow:0 4px 16px rgba(26,63,111,0.13);}
+.user-avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#1a3f6f,#2d6ab0);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;letter-spacing:0.5px;}
+.user-avatar.adm{background:linear-gradient(135deg,#c8960a,#e6b800);}
 .user-info{flex:1;}
-.uname{font-size:12px;font-weight:600;color:#2d3748;}
-.urole{font-size:10px;color:#718096;}
-.user-actions{display:flex;gap:4px;}
-.ubtn{font-size:10px;padding:4px 9px;border-radius:4px;border:0.5px solid #dde3ed;cursor:pointer;background:#fff;color:#4a5568;font-family:'Times New Roman',Times,serif;font-weight:700;white-space:nowrap;}
-.ubtn:hover{background:#eef3fa;color:#1a3f6f;}
-.ubtn.del:hover{background:#fff0f0;color:#c62828;}
+.uname{font-size:13px;font-weight:700;color:#1a3f6f;letter-spacing:0.2px;}
+.urole{font-size:11px;color:#94a3b8;margin-top:2px;}
+.user-status-dot{width:8px;height:8px;border-radius:50%;background:#38a169;flex-shrink:0;box-shadow:0 0 0 2px #c6f6d5;}
+.user-status-dot.bloqueado{background:#e53e3e;box-shadow:0 0 0 2px #fed7d7;}
+.user-actions{display:flex;gap:6px;align-items:center;}
+.ubtn{width:30px;height:30px;border-radius:8px;border:1px solid #e2e8f0;cursor:pointer;background:#f8fafc;color:#64748b;font-family:inherit;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:13px;padding:0;transition:all 0.15s;white-space:nowrap;}
+.ubtn:hover{background:#eef3fa;color:#1a3f6f;border-color:#b8cfe8;transform:scale(1.08);}
+.ubtn.del:hover{background:#fff0f0;color:#c62828;border-color:#ffcdd2;}
+.ubtn.blq{background:#fff0f0;color:#e53e3e;border-color:#fed7d7;}
+.ubtn.blq:hover{background:#e53e3e;color:#fff;}
+.ubtn.act{background:#f0fff4;color:#38a169;border-color:#c6f6d5;}
+.ubtn.act:hover{background:#38a169;color:#fff;}
 
 /* Iconos cuadraditos de servicios MAAH (al lado de cada usuario) */
 .svc-mini-row{display:flex;gap:3px;flex-shrink:0;margin-right:8px;}
@@ -4980,9 +4987,9 @@ function loadUserList(){
         </div>
         <div class="svc-mini-row">${svcIcons}</div>
         <div class="user-actions">
-          ${(!isAdmin && !isSelf)?`<button class="ubtn" style="${bloqueado?'background:#2f855a;color:#fff;border-color:#2f855a;':'background:#c62828;color:#fff;border-color:#c62828;'}" onclick="toggleBloqueoUser('${u.id}','${u.nombre.replace(/'/g,"\\'")}',${bloqueado})" title="${bloqueado?'Desbloquear':'Bloquear'}">${bloqueado?'✓ Activar':'🚫 Bloquear'}</button>`:''}
-          <button class="ubtn" onclick="openEditUser('${u.id}','${u.nombre.replace(/'/g,"\\'")}','${u.rol}','${(u.tgid||'').replace(/'/g,"\\'")}')" title="Editar">&#9998;</button>
-          ${(!isAdmin && !isSelf)?`<button class="ubtn del" onclick="deleteUser('${u.id}','${u.nombre.replace(/'/g,"\\'")}')" title="Eliminar">&#10005;</button>`:''}
+          ${(!isAdmin && !isSelf)?`<button class="ubtn ${bloqueado?'act':'blq'}" onclick="toggleBloqueoUser('${u.id}','${u.nombre.replace(/'/g,"\\'")}',${bloqueado})" title="${bloqueado?'Desbloquear':'Bloquear'}">${bloqueado?'✓':'🚫'}</button>`:''}
+          <button class="ubtn" onclick="openEditUser('${u.id}','${u.nombre.replace(/'/g,"\\'")}','${u.rol}','${(u.tgid||'').replace(/'/g,"\\'")}')" title="Editar">✎</button>
+          ${(!isAdmin && !isSelf)?`<button class="ubtn del" onclick="deleteUser('${u.id}','${u.nombre.replace(/'/g,"\\'")}')" title="Eliminar">✕</button>`:''}
         </div>
       </div>`;
     }).join('');
