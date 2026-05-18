@@ -4987,7 +4987,7 @@ function toggleTgBox(){
   }
 }
 
-const EFEMERIDES={
+var EFEMERIDES={
 '01-01':{tipo:'mundo',ano:1863,titulo:'Proclamación de Emancipación de Lincoln',texto:'El 1 de enero de 1863, el presidente Abraham Lincoln emitió la Proclamación de Emancipación, declarando libres a todos los esclavos en los estados confederados en rebelión. Este acto transformó la Guerra Civil Americana, convirtiendo el conflicto no solo en una lucha por la unión del país, sino en una guerra por la libertad humana. Aunque la proclamación no liberó de inmediato a todos los esclavos —solo aplicaba a los estados en rebelión—, sentó las bases morales y legales para la abolición definitiva. Lincoln utilizó sus poderes de comandante en jefe para justificar el decreto como medida militar. La proclamación permitió que los hombres negros se alistaran en el ejército de la Unión, sumando finalmente casi 200.000 soldados afroamericanos. Tuvo también efectos internacionales: desalentó el reconocimiento diplomático de la Confederación por Gran Bretaña y Francia. Fue el precedente directo de la XIII Enmienda Constitucional de 1865, que abolió formalmente la esclavitud en todo el territorio nacional.'},
 '01-13':{tipo:'chile',ano:1881,titulo:'Batalla de Chorrillos — Guerra del Pacífico',texto:'El 13 de enero de 1881, el Ejército de Chile al mando del General Manuel Baquedano atacó las posiciones peruanas en los cerros de Chorrillos, al sur de Lima. La batalla fue extraordinariamente sangrienta: Chile empleó más de 20.000 soldados contra una fuerza peruana de similar magnitud, bien atrincherada en posiciones elevadas. El ataque comenzó al amanecer con la división del general Pedro Lagos avanzando por el flanco derecho. Tras horas de combate encarnizado, las tropas tomaron el Morro Solar y las posiciones enemigas una a una. La artillería peruana causó enormes bajas, pero la determinación del soldado chileno fue decisiva. Cerca del mediodía la resistencia peruana colapsó y sus tropas se retiraron en desorden. Chile sufrió alrededor de 2.000 bajas entre muertos y heridos; las pérdidas peruanas fueron aún mayores. La victoria abrió las puertas de Lima. Solo dos días después vendría la Batalla de Miraflores, completando la conquista de la capital peruana.'},
 '01-15':{tipo:'chile',ano:1881,titulo:'Batalla de Miraflores — Las puertas de Lima',texto:'El 15 de enero de 1881, apenas dos días después de Chorrillos, las tropas chilenas debieron librar una segunda batalla decisiva en Miraflores, suburbio de Lima. El presidente peruano García Calderón intentó negociar un armisticio, pero las conversaciones fracasaron cuando las unidades peruanas abrieron fuego. El General Baquedano ordenó el ataque general y en pocas horas las posiciones de Miraflores fueron tomadas. La resistencia fue más breve que en Chorrillos, pero feroz, con combates calle a calle en algunos sectores. Tras la derrota, Lima quedó completamente a merced del ejército chileno, que entró a la ciudad el 17 de enero. La ocupación fue un golpe psicológico devastador para el Perú, aunque la guerra continuó en la sierra bajo Andrés Avelino Cáceres. Miraflores simbolizó el triunfo de la estrategia chilena de atacar directamente la capital para forzar la rendición, acelerando el desenlace del conflicto iniciado en 1879.'},
@@ -5027,7 +5027,7 @@ const EFEMERIDES={
 '12-13':{tipo:'mundo',ano:1939,titulo:'Batalla del Río de la Plata — El Graf Spee en el Plata',texto:'El 13 de diciembre de 1939, en aguas del Atlántico Sur frente a Uruguay, el acorazado de bolsillo alemán Admiral Graf Spee fue alcanzado y dañado por tres cruceros británicos en la primera gran batalla naval de la Segunda Guerra Mundial. El Graf Spee había hundido nueve barcos mercantes aliados, convirtiéndose en una pesadilla para el comercio marítimo. Los cruceros HMS Exeter, Ajax y Achilles, en inferioridad de armamento pero superiores en número, atacaron al Graf Spee por ángulos diferentes. El Graf Spee causó daños severos pero también recibió impactos que dañaron su sistema de purificación de petróleo y buscó refugio en Montevideo, Uruguay. Tras 72 horas de negociaciones diplomáticas, convencido de que una flota mayor lo esperaba, el capitán Langsdorff salió al estuario y hundió su propio barco. Tres días después se suicidó envuelto en la bandera de guerra alemana. El incidente fue la primera victoria naval aliada de la guerra y ocurrió muy cerca de las costas sudamericanas.'}
 };
 
-const MESES_ES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+var MESES_EFEM=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 
 function renderEfemeride(){
   const hoy=new Date();
@@ -5056,7 +5056,7 @@ function renderEfemeride(){
   const esChile=ef.tipo==='chile';
   badge.textContent=esChile?'🇨🇱 Chile':'🌍 Mundo';
   badge.style.background=esChile?'#c62828':'#1565c0';
-  dateEl.textContent='Hoy '+hoy.getDate()+' de '+MESES_ES[hoy.getMonth()]+' de '+ef.ano;
+  dateEl.textContent='Hoy '+hoy.getDate()+' de '+MESES_EFEM[hoy.getMonth()]+' de '+ef.ano;
   tituloEl.textContent=ef.titulo;
   textoEl.textContent=ef.texto;
 }
