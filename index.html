@@ -1441,7 +1441,7 @@ firebase.initializeApp(FB_CONFIG);
 const db=firebase.database();
 
 // ── TELEGRAM ─────────────────────────────────────────────────
-const TG_TOKEN='8439566682:AAHSM9JXlNDwh-WK3GP5b205fdGGHfikUpY';
+let TG_TOKEN=null; db.ref('maah_config').once('value',s=>{TG_TOKEN=s.val();});
 const TG_ADMIN_CHATID='8290529563';
 
 // Envía mensaje nuevo y guarda el message_id en Firebase con la fecha correcta
