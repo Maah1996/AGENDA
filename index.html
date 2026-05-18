@@ -5034,31 +5034,50 @@ function renderEfemeride(){
   const mm=String(hoy.getMonth()+1).padStart(2,'0');
   const dd=String(hoy.getDate()).padStart(2,'0');
   const key=mm+'-'+dd;
-  let ef=EFEMERIDES[key];
-  if(!ef){
-    const dia=hoy.getDate();
-    let minDist=999,nearest=null;
-    Object.entries(EFEMERIDES).forEach(([k,v])=>{
-      if(k.startsWith(mm+'-')){
-        const d=parseInt(k.split('-')[1]);
-        const dist=Math.abs(d-dia);
-        if(dist<minDist){minDist=dist;nearest=v;}
-      }
-    });
-    ef=nearest;
-  }
-  if(!ef) return;
   const badge=document.getElementById('efem-badge');
   const dateEl=document.getElementById('efem-date');
   const tituloEl=document.getElementById('efem-titulo');
   const textoEl=document.getElementById('efem-texto');
   if(!badge||!dateEl||!tituloEl||!textoEl) return;
-  const esChile=ef.tipo==='chile';
-  badge.textContent=esChile?'🇨🇱 Chile':'🌍 Mundo';
-  badge.style.background=esChile?'#c62828':'#1565c0';
-  dateEl.textContent='Hoy '+hoy.getDate()+' de '+MESES_EFEM[hoy.getMonth()]+' de '+ef.ano;
-  tituloEl.textContent=ef.titulo;
-  textoEl.textContent=ef.texto;
+
+  // Caso exacto: hay efeméride hoy
+  if(EFEMERIDES[key]){
+    var ef=EFEMERIDES[key];
+    var esChile=ef.tipo==='chile';
+    badge.textContent=esChile?'🇨🇱 Chile':'🌍 Mundo';
+    badge.style.background=esChile?'#c62828':'#1565c0';
+    dateEl.textContent='Hoy '+hoy.getDate()+' de '+MESES_EFEM[hoy.getMonth()]+' de '+ef.ano;
+    tituloEl.textContent=ef.titulo;
+    textoEl.textContent=ef.texto;
+    return;
+  }
+
+  // Sin efeméride hoy: buscar la próxima fecha futura más cercana
+  var anioBase=hoy.getFullYear();
+  var mejorDias=9999,mejorKey=null;
+  Object.keys(EFEMERIDES).forEach(function(k){
+    var partes=k.split('-');
+    var m=parseInt(partes[0])-1;
+    var d=parseInt(partes[1]);
+    // Intentar este año, si ya pasó intentar el siguiente
+    var candidato=new Date(anioBase,m,d);
+    if(candidato<=hoy) candidato=new Date(anioBase+1,m,d);
+    var dias=Math.round((candidato-hoy)/(1000*60*60*24));
+    if(dias<mejorDias){mejorDias=dias;mejorKey=k;}
+  });
+
+  if(!mejorKey) return;
+  var efProx=EFEMERIDES[mejorKey];
+  var partes2=mejorKey.split('-');
+  var diaProx=parseInt(partes2[1]);
+  var mesProx=parseInt(partes2[0])-1;
+  var esChile2=efProx.tipo==='chile';
+  badge.textContent=esChile2?'🇨🇱 Chile':'🌍 Mundo';
+  badge.style.background=esChile2?'#c62828':'#1565c0';
+  var diasStr=mejorDias===1?'mañana':'en '+mejorDias+' días';
+  dateEl.textContent='El '+diaProx+' de '+MESES_EFEM[mesProx]+' — '+diasStr;
+  tituloEl.textContent='Se acerca: '+efProx.titulo;
+  textoEl.textContent='';
 }
 </script>
 
