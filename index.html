@@ -1988,15 +1988,14 @@ function startApp(){
   }
   mostrarFrases();
   loadClima();
-  // Efemérides solo para admin; Telegram para admin o cualquier usuario con tgid
+  // Efemérides y Telegram (desplegable) solo para admin
   const esAdmin=currentUser&&currentUser.rol==='admin';
-  const tieneTG=esAdmin||!!(currentUser&&currentUser.tgid);
   const _efemEl=document.querySelector('.efem-card');
   const _tgRowEl=document.querySelector('.tg-toggle-row');
   const _tgColEl=document.getElementById('tg-collapsible');
   if(_efemEl) _efemEl.style.display=esAdmin?'':'none';
-  if(_tgRowEl) _tgRowEl.style.display=tieneTG?'':'none';
-  if(_tgColEl && !tieneTG) _tgColEl.style.display='none';
+  if(_tgRowEl) _tgRowEl.style.display=esAdmin?'':'none';
+  if(_tgColEl && !esAdmin) _tgColEl.style.display='none';
   if(esAdmin) try{
     if(typeof renderEfemeride==='function') renderEfemeride();
     else document.getElementById('efem-texto').textContent='[Error: módulo no cargado]';
