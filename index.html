@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <!-- saved from url=(0034)https://maah1996.github.io/Agenda/ -->
 <html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
@@ -1441,7 +1441,7 @@ firebase.initializeApp(FB_CONFIG);
 const db=firebase.database();
 
 // ── TELEGRAM ─────────────────────────────────────────────────
-let TG_TOKEN=null; db.ref('maah_config').once('value',s=>{TG_TOKEN=s.val();});
+let TG_TOKEN=null; db.ref('maah_agenda/maah_config').once('value',s=>{TG_TOKEN=s.val();});
 const TG_ADMIN_CHATID='8290529563';
 
 // Envía mensaje nuevo y guarda el message_id en Firebase con la fecha correcta
@@ -3396,8 +3396,8 @@ function saveEditAct(){
     } else {
       agendaWrite=origenPath.set(agendaEntry);
     }
-  } else {
-    // Actividad que viene del Gantt (sin clave en agenda) → crear entrada nueva
+  } else if(!editingActGanttKey) {
+    // Solo crear nueva entrada si NO viene del Gantt (evita duplicados en recurrentes)
     agendaWrite=db.ref('maah_agenda/'+currentUser.id+'/'+fechaDestino).push(agendaEntry);
   }
 
