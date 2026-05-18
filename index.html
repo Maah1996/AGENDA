@@ -2997,6 +2997,7 @@ function showActsPanel(tipo, mesOffset, anoOffset){
       const merged=[...agendaActs,...ganttActs].sort((a,b)=>(a.hora||'').localeCompare(b.hora||''));
       if(merged.length>0) actsPorFecha[fecha]=merged;
     });
+    _ovActsData={actsPorFecha, tituloPanel: titulos[tipo]||titulos.mes};
     const fechas=Object.keys(actsPorFecha).sort();
     if(!fechas.length){
       body='<div class="ov-acts-empty">No hay actividades en este período.</div>';
@@ -3070,36 +3071,69 @@ function imprimirResumen(){
   setTimeout(()=>w.print(),400);
 }
 
+var _ovActsData = null;
+function _enviarResumenTGTexto(chatId, titulo){
+  const datos = _ovActsData;
+  const emojis = ['🔴','🟠','🟡','🟢','🔵','🟣','⚫'];
+  const DIA_L = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const MES_A = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  let msg = `📅 <b>${(titulo||'Resumen MAAH').toUpperCase()}</b>\n\n`;
+  let total = 0;
+  if(datos && datos.actsPorFecha){
+    Object.keys(datos.actsPorFecha).sort().forEach(fecha=>{
+      const acts = datos.actsPorFecha[fecha];
+      if(!acts||!acts.length) return;
+      const dn = new Date(fecha+'T12:00:00');
+      msg += `<b>${DIA_L[dn.getDay()]} ${dn.getDate()} de ${MES_A[dn.getMonth()]}:</b>\n`;
+      acts.forEach((a,i)=>{
+        total++;
+        msg += `  ${emojis[i%emojis.length]} ${a.hora||'--:--'} — ${a.act}`;
+        if(a.obs) msg += ` <i>(${a.obs})</i>`;
+        if(a.priori) msg += ' ⚑';
+        msg += '\n';
+      });
+      msg += '\n';
+    });
+  }
+  if(total===0) msg += '✅ No hay actividades en este período.\n';
+  const key = 'resumen_' + fmtDateKey(new Date());
+  sendTG(chatId, msg, key);
+  document.getElementById('ov-acts-overlay')?.classList.remove('open');
+  alert('Resumen enviado a Telegram ✓');
+}
+
 function enviarResumenTG(){
   if(!currentUser) return;
-  const panel = document.querySelector('.ov-acts-panel');
-  const titleEl = document.querySelector('.ov-acts-title');
-  if(!panel) return;
   const chatId = currentUser.tgid||TG_ADMIN_CHATID;
-  const caption = (titleEl?titleEl.textContent:'Resumen MAAH')+' — '+currentUser.nombre;
+  const titleEl = document.querySelector('.ov-acts-title');
+  const titulo = titleEl ? titleEl.textContent : (_ovActsData ? _ovActsData.tituloPanel : 'Resumen MAAH');
 
+  // Si html2canvas no está disponible, enviar como texto
   if(typeof html2canvas === 'undefined'){
-    alert('La librería de captura no está disponible. Intenta recargar la página.');
+    _enviarResumenTGTexto(chatId, titulo);
     return;
   }
 
-  // Capturar el panel como imagen y enviar a Telegram
+  const panel = document.querySelector('.ov-acts-panel');
+  if(!panel){ _enviarResumenTGTexto(chatId, titulo); return; }
+
+  // Intentar captura como imagen; si falla, caer a texto
   html2canvas(panel, {scale:2, useCORS:true, backgroundColor:'#ffffff'}).then(canvas=>{
     canvas.toBlob(blob=>{
-      if(!blob){ alert('Error al generar la imagen.'); return; }
+      if(!blob){ _enviarResumenTGTexto(chatId, titulo); return; }
       const fd = new FormData();
       fd.append('chat_id', chatId);
       fd.append('photo', blob, 'resumen.png');
-      fd.append('caption', caption);
+      fd.append('caption', titulo+' — '+currentUser.nombre);
       fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendPhoto`,{method:'POST',body:fd})
         .then(r=>r.json())
         .then(data=>{
           if(data.ok){ alert('Resumen enviado a Telegram ✓'); }
-          else{ alert('Error Telegram: '+(data.description||'desconocido')); }
+          else{ _enviarResumenTGTexto(chatId, titulo); }
         })
-        .catch(()=>alert('Error de conexión con Telegram.'));
+        .catch(()=>_enviarResumenTGTexto(chatId, titulo));
     },'image/png');
-  }).catch(()=>alert('Error al capturar la pantalla.'));
+  }).catch(()=>_enviarResumenTGTexto(chatId, titulo));
 }
 
 function renderTLDia(){
@@ -3611,7 +3645,7 @@ function abrirResumenModal(periodo){
     const _tieneTG = currentUser && (currentUser.tgid || currentUser.rol==='admin');
     if(footer && _tieneTG && totalActs > 0){
       _resumenTGCache = {periodo, dias, tituloPeriodo};
-      footer.innerHTML = '<button class="btn-tg" onclick="enviarResumenTG()">✈ Enviar a Telegram</button>';
+      footer.innerHTML = '<button class="btn-tg" onclick="enviarResumenPeriodoTG()">✈ Enviar a Telegram</button>';
     }
   }).catch(err=>{
     const body = document.getElementById('resumen-modal-body');
@@ -3620,7 +3654,7 @@ function abrirResumenModal(periodo){
 }
 
 var _resumenTGCache = null;
-function enviarResumenTG(){
+function enviarResumenPeriodoTG(){
   if(!_resumenTGCache || !currentUser) return;
   const chatId = currentUser.tgid || TG_ADMIN_CHATID;
   const {periodo, dias, tituloPeriodo} = _resumenTGCache;
