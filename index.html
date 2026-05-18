@@ -5054,6 +5054,7 @@ function renderEfemeride(){
 
   // Sin efeméride hoy: buscar la próxima fecha futura más cercana
   var anioBase=hoy.getFullYear();
+  var hoyMid=new Date(anioBase,hoy.getMonth(),hoy.getDate()); // medianoche hoy
   var mejorDias=9999,mejorKey=null;
   Object.keys(EFEMERIDES).forEach(function(k){
     var partes=k.split('-');
@@ -5061,8 +5062,8 @@ function renderEfemeride(){
     var d=parseInt(partes[1]);
     // Intentar este año, si ya pasó intentar el siguiente
     var candidato=new Date(anioBase,m,d);
-    if(candidato<=hoy) candidato=new Date(anioBase+1,m,d);
-    var dias=Math.round((candidato-hoy)/(1000*60*60*24));
+    if(candidato<=hoyMid) candidato=new Date(anioBase+1,m,d);
+    var dias=Math.round((candidato-hoyMid)/(1000*60*60*24));
     if(dias<mejorDias){mejorDias=dias;mejorKey=k;}
   });
 
