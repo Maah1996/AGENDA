@@ -272,6 +272,7 @@ body{font-family:'Times New Roman',Times,serif;background:#eef2f7;min-height:100
 .tl-btn{font-size:9px;padding:2px 7px;border-radius:4px;border:0.5px solid #dde3ed;cursor:pointer;background:#fff;color:#4a5568;}
 .tl-btn:hover{background:#eef3fa;color:#1a3f6f;}
 .tl-btn.del:hover{background:#fff0f0;color:#c62828;}
+.tl-btn.gantt:hover{background:#f0f5ff;color:#2c5282;}
 .empty-tl{text-align:center;padding:18px;color:#94a3b8;font-size:11px;font-style:italic;background:#fafbfc;border-radius:8px;border:1px dashed #e2e8f0;}
 
 /* === AGENDA OVERVIEW ======================================= */
@@ -2298,7 +2299,11 @@ function guardarAgenda(){
   // Lee las actividades existentes y las combina con las nuevas
   db.ref(`maah_agenda/${currentUser.id}/${fecha}`).once('value',snap=>{
     const existing=snap.val()?Object.values(snap.val()):[];
-    const combined=[...existing,...newActs];
+    // Fusionar sin duplicados: newActs actualiza entradas con mismo hora+act
+    const map={};
+    existing.forEach(a=>{map[(a.hora||'')+'|'+(a.act||'')]=a;});
+    newActs.forEach(a=>{map[(a.hora||'')+'|'+(a.act||'')]=a;});
+    const combined=Object.values(map);
     // Ordena por hora y re-indexa
     combined.sort((a,b)=>a.hora.localeCompare(b.hora));
     const obj=combined.reduce((o,a,i)=>{o[i]=a;return o;},{});
@@ -3332,6 +3337,7 @@ function renderTimeline(fecha,acts,showDay){
         <div class="tl-actions">
           <button class="tl-btn" data-fecha="${esc(fecha)}" data-hora="${esc(a.hora)}" data-act="${esc(a.act)}" data-obs="${esc(a.obs||'')}" onclick="openEditActBtn(this)">&#9998; Editar</button>
           <button class="tl-btn del" data-fecha="${esc(fecha)}" data-hora="${esc(a.hora)}" data-act="${esc(a.act)}" data-obs="${esc(a.obs||'')}" onclick="deleteActBtn(this)">&#10005; Eliminar</button>
+          ${!a._tipo?`<button class="tl-btn gantt" data-fecha="${esc(fecha)}" data-hora="${esc(a.hora)}" data-act="${esc(a.act)}" data-obs="${esc(a.obs||'')}" onclick="enviarActAGanttBtn(this)">&#9655; Gantt</button>`:''}
         </div>
       </div>
     </div>`;
@@ -3339,6 +3345,31 @@ function renderTimeline(fecha,acts,showDay){
 }
 function openEditActBtn(el){openEditAct(el.dataset.fecha,el.dataset.hora,el.dataset.act,el.dataset.obs);}
 function deleteActBtn(el){deleteAct(el.dataset.fecha,el.dataset.hora,el.dataset.act,el.dataset.obs);}
+function enviarActAGanttBtn(el){enviarActAGantt(el.dataset.fecha,el.dataset.hora,el.dataset.act,el.dataset.obs);}
+function enviarActAGantt(fecha,hora,act,obs){
+  const ganttRef=db.ref('gantt_maah/actividades_por_usuario/'+currentUser.id);
+  ganttRef.once('value',snap=>{
+    const data=snap.val()||{};
+    const titulo=(hora?hora+' — ':'')+act+(obs?' · '+obs:'');
+    let existingKey=null;
+    for(const[k,v] of Object.entries(data)){
+      if(v && v.agendaFecha===fecha && (v.agendaHora||'')===(hora||'')){existingKey=k;break;}
+    }
+    if(existingKey){
+      ganttRef.child(existingKey).update({act:titulo.toUpperCase().trim(),obs:(obs||'').toUpperCase().trim()});
+    } else {
+      let maxId=0;
+      Object.values(data).forEach(a=>{if(a&&typeof a.id==='number'&&a.id>maxId)maxId=a.id;});
+      const id=maxId+1;
+      const[yr,mo,da]=fecha.split('-').map(Number);
+      const reg={id,act:titulo.toUpperCase().trim(),obs:(obs||'').toUpperCase().trim(),
+        type:'revision',freq:'puntual',fecha:new Date(yr,mo-1,da,12,0,0).toISOString(),
+        fromAgenda:true,agendaFecha:fecha,agendaHora:hora||''};
+      ganttRef.child(id).set(reg);
+    }
+    _ganttDataCache=null;
+  });
+}
 
 function renderTimelineMulti(acts){
   const tl=document.getElementById('timeline-view');
