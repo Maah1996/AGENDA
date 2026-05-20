@@ -2353,7 +2353,7 @@ function sincronizarAGantt(fecha, items){
       }
       const id=existingKey ? Number(existingKey) : nextId++;
       const key=String(existingKey||id);
-      const titulo=a.act + (a.obs?(' · '+a.obs):'');
+      const titulo=(a.hora?a.hora+' — ':'')+a.act + (a.obs?(' · '+a.obs):'');
       const reg={
         id:id,
         act:titulo.toUpperCase().trim(),
@@ -3476,7 +3476,7 @@ function saveEditAct(){
   let ganttWrite=Promise.resolve();
   if(editingActGanttKey){
     if(anyGantt){
-      const titulo=act+(obs?' · '+obs:'');
+      const titulo=(hora?hora+' — ':'')+act+(obs?' · '+obs:'');
       const upd={act:titulo,obs:obs,agendaHora:hora,agendaFecha:fechaDestino,fecha:fechaLocal.toISOString(),fromAgenda:true};
       upd.freq=sendAnual?'anual':sendMensual?'mensual':sendSemanal?'semanal':'puntual';
       upd.anual=sendAnual||null; upd.mensual=sendMensual||null; upd.semanal=sendSemanal||null;
@@ -3494,7 +3494,7 @@ function saveEditAct(){
       let maxId=0;
       Object.values(data).forEach(a=>{if(a&&typeof a.id==='number'&&a.id>maxId)maxId=a.id;});
       const id=maxId+1;
-      const titulo=act+(obs?' · '+obs:'');
+      const titulo=(hora?hora+' — ':'')+act+(obs?' · '+obs:'');
       const reg={id,act:titulo,obs,type:'revision',fecha:fechaLocal.toISOString(),
         fromAgenda:true,agendaFecha:fechaDestino,agendaHora:hora};
       reg.freq=sendAnual?'anual':sendMensual?'mensual':sendSemanal?'semanal':'puntual';
