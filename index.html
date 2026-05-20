@@ -2340,13 +2340,19 @@ function sincronizarAGantt(fecha, items){
     let maxId=0;
     Object.values(data).forEach(a=>{ if(a && typeof a.id==='number' && a.id>maxId) maxId=a.id; });
     let nextId=maxId+1;
-    // ISO local sin TZ: "YYYY-MM-DDT12:00:00.000Z" lo evitamos; usamos
-    // 12:00 hora local para que ningún navegador caiga al día anterior.
     const [yr,mo,da]=fecha.split('-').map(Number);
     const fechaLocal=new Date(yr, mo-1, da, 12, 0, 0);
     const updates={};
     items.forEach(a=>{
-      const id=nextId++;
+      // Reusar clave existente si ya hay una entrada para esta fecha+hora (evita duplicados)
+      let existingKey=null;
+      for(const [k,v] of Object.entries(data)){
+        if(v && v.agendaFecha===fecha && (v.agendaHora||'')===(a.hora||'')){
+          existingKey=k; break;
+        }
+      }
+      const id=existingKey ? Number(existingKey) : nextId++;
+      const key=String(existingKey||id);
       const titulo=a.act + (a.obs?(' · '+a.obs):'');
       const reg={
         id:id,
@@ -2358,27 +2364,21 @@ function sincronizarAGantt(fecha, items){
         agendaFecha:fecha,
         agendaHora:a.hora||''
       };
-      if(a.priori) reg.priori=true;
+      if(a.priori) reg.priori=true; else delete reg.priori;
       if(a.sendAnual){
-        reg.freq='anual';
-        reg.anual=true;
-        reg.dia=da;
-        reg.mes=mo-1;
-      }
-      if(a.sendMensual){
-        reg.freq='mensual';
-        reg.mensual=true;
-        reg.dia=da;
-      }
-      if(a.sendSemanal){
-        reg.freq='semanal';
-        reg.semanal=true;
-        reg.dow=fechaLocal.getDay();
-      }
-      if(!a.sendAnual && !a.sendMensual && !a.sendSemanal){
+        reg.freq='anual'; reg.anual=true; reg.dia=da; reg.mes=mo-1;
+        reg.mensual=null; reg.semanal=null;
+      } else if(a.sendMensual){
+        reg.freq='mensual'; reg.mensual=true; reg.dia=da;
+        reg.anual=null; reg.semanal=null;
+      } else if(a.sendSemanal){
+        reg.freq='semanal'; reg.semanal=true; reg.dow=fechaLocal.getDay();
+        reg.anual=null; reg.mensual=null;
+      } else {
         reg.freq='puntual';
+        reg.anual=null; reg.mensual=null; reg.semanal=null;
       }
-      updates[id]=reg;
+      updates[key]=reg;
     });
     ref.update(updates, err=>{
       if(err){
@@ -3395,6 +3395,9 @@ function openEditAct(fecha,hora,act,obs){
   ['edit-chk-priori','edit-chk-gantt','edit-chk-semanal','edit-chk-mensual','edit-chk-anual'].forEach(id=>{
     document.getElementById(id).checked=false;
   });
+  // Deshabilitar Guardar hasta que se completen las lecturas async
+  const saveBtn=document.querySelector('#modal-edit-act .btn-save-m');
+  if(saveBtn){ saveBtn.disabled=true; saveBtn.style.opacity='0.5'; }
   // Buscar en Gantt para pre-marcar los checkboxes
   db.ref('gantt_maah/actividades_por_usuario/'+currentUser.id).once('value',snap=>{
     const gd=snap.val()||{};
@@ -3424,6 +3427,8 @@ function openEditAct(fecha,hora,act,obs){
           document.getElementById('edit-chk-priori').checked=!!(v.priori);
         }
       });
+      // Re-habilitar Guardar una vez que ambas lecturas completaron
+      if(saveBtn){ saveBtn.disabled=false; saveBtn.style.opacity=''; }
     });
   });
   document.getElementById('modal-edit-act').classList.add('open');
