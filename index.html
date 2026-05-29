@@ -2294,7 +2294,7 @@ function guardarAgenda(){
   // Las que van a la agenda guardan {hora, act, obs} + priori si está marcado.
   const newActs=rowData.map(a=>{const o={hora:a.hora,act:a.act,obs:a.obs};if(a.priori)o.priori=true;return o;});
   // Las que van a la Gantt llevan los flags; se sincronizan después de guardar la agenda.
-  const ganttActs=rowData.filter(a=>a.sendGantt||a.sendSemanal||a.sendMensual||a.sendAnual);
+  const ganttActs=rowData.filter(a=>a.sendGantt||a.sendSemanal||a.sendMensual||a.sendAnual||a.priori);
 
   // Lee las actividades existentes y las combina con las nuevas
   db.ref(`maah_agenda/${currentUser.id}/${fecha}`).once('value',snap=>{
